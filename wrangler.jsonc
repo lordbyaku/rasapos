@@ -15,8 +15,7 @@
     {
       "binding": "CORE",
       "database_name": "rasapos-core",
-      // Ganti dengan ID dari `npx wrangler d1 create rasapos-core` sebelum deploy.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "ee04fe43-cb5a-460f-81a5-b8f0f3e10a23",
       "migrations_dir": "migrations"
     }
   ],
@@ -28,8 +27,8 @@
   // "r2_buckets": [{ "binding": "BACKUP", "bucket_name": "rasapos-backup" }],
   "vars": {
     "APP_NAME": "RasaPOS",
-    "APP_URL": "http://localhost:8787",
-    "SUPERADMIN_EMAILS": "admin@rasapos.local",
+    "APP_URL": "https://rasapos.haritrisna.workers.dev",
+    "SUPERADMIN_EMAILS": "haritrisna@gmail.com,na_grow@yahoo.com",
     "TRIAL_DAYS": "14",
     "GRACE_DAYS": "3",
     "OUTLETS_PER_PACK": "5",
