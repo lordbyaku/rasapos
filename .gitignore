@@ -1,0 +1,9 @@
+node_modules/
+.wrangler/
+.dev.vars
+.env
+public/vendor/
+public/css/app.css
+*.log
+.wrangler-dev.log
+.claude/

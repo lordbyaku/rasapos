@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu &amp; Modifier — RasaPOS (Mockup)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/style.css">
+    <script>tailwind.config = { theme: { extend: { colors: { brand: { 50: '#fff7ed', 100: '#ffedd5', 500: '#f97316', 600: '#ea580c', 700: '#c2410c' } } } } };</script>
+</head>
+<body class="bg-stone-100 text-stone-800 h-screen overflow-hidden flex">
+
+    <aside class="w-60 bg-stone-900 text-stone-300 flex flex-col shrink-0">
+        <div class="h-16 flex items-center gap-3 px-4 border-b border-stone-800">
+            <a href="index.html" class="w-9 h-9 rounded-xl bg-brand-500 text-white grid place-items-center font-extrabold">R</a>
+            <div class="leading-tight"><div class="font-bold text-white text-sm">Kopi &amp; Makan Nusantara</div><div class="text-[11px] text-stone-500">Back Office · Owner</div></div>
+        </div>
+        <nav class="p-3 space-y-0.5 text-sm">
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="dashboard.html"><i class="fas fa-chart-line w-4"></i>Dashboard</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="dashboard.html#tx"><i class="fas fa-receipt w-4"></i>Transaksi</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#"><i class="fas fa-file-lines w-4"></i>Laporan</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-brand-500 text-white font-semibold" href="menu.html"><i class="fas fa-utensils w-4"></i>Menu &amp; Modifier</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#"><i class="fas fa-tags w-4"></i>Promo</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#"><i class="fas fa-boxes-stacked w-4"></i>Bahan &amp; Resep</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#"><i class="fas fa-store w-4"></i>Outlet</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#"><i class="fas fa-users w-4"></i>Staff &amp; Akses</a>
+        </nav>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0">
+        <header class="h-16 bg-white border-b border-stone-200 flex items-center px-5 gap-3 shrink-0">
+            <h1 class="text-lg font-bold">Menu &amp; Modifier</h1>
+            <div class="ml-4 flex bg-stone-100 rounded-xl p-1 text-sm font-medium">
+                <button class="px-3 py-1.5 rounded-lg bg-white shadow-sm">Menu</button>
+                <button class="px-3 py-1.5 rounded-lg text-stone-500">Kategori</button>
+                <button class="px-3 py-1.5 rounded-lg text-stone-500">Grup Modifier</button>
+                <button class="px-3 py-1.5 rounded-lg text-stone-500">Paket</button>
+            </div>
+            <div class="ml-auto flex gap-2 text-sm">
+                <button class="px-3 py-2 rounded-xl border border-stone-200"><i class="fas fa-file-import mr-1"></i>Import CSV</button>
+                <button class="px-3 py-2 rounded-xl bg-brand-500 text-white font-semibold"><i class="fas fa-plus mr-1"></i>Menu Baru</button>
+            </div>
+        </header>
+
+        <div class="flex-1 flex min-h-0">
+            <main class="flex-1 overflow-y-auto thin-scroll p-5">
+                <div class="flex gap-2 mb-3">
+                    <div class="relative flex-1"><i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"></i><input placeholder="Cari menu…" class="w-full pl-9 pr-3 py-2 rounded-xl border border-stone-200 bg-white text-sm"></div>
+                    <select class="border border-stone-200 rounded-xl px-3 text-sm bg-white"><option>Semua kategori</option></select>
+                    <select class="border border-stone-200 rounded-xl px-3 text-sm bg-white"><option>Semua stasiun</option><option>Dapur</option><option>Bar</option><option>Pastry</option></select>
+                </div>
+                <table class="w-full text-sm bg-white rounded-2xl overflow-hidden border border-stone-200">
+                    <thead class="bg-stone-50 text-stone-500 text-xs uppercase"><tr>
+                        <th class="text-left px-4 py-2">Menu</th><th class="text-left px-4 py-2">Kategori</th><th class="text-left px-4 py-2">Stasiun</th>
+                        <th class="text-right px-4 py-2">Harga Dasar</th><th class="text-left px-4 py-2">Modifier</th><th class="text-left px-4 py-2">Tersedia di</th></tr></thead>
+                    <tbody id="rows"></tbody>
+                </table>
+            </main>
+
+            <aside id="editor" class="w-[440px] bg-white border-l border-stone-200 flex flex-col shrink-0"></aside>
+        </div>
+    </div>
+
+    <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-stone-900 text-white px-4 py-2.5 rounded-xl text-sm z-[60]"></div>
+
+    <script src="assets/data.js"></script>
+    <script>
+        const M = window.MOCK;
+        let sel = 1, tab = 'outlet';
+        const avail = id => M.outlets.map(o => !(id === 14 && o.id !== 1) && !(id === 20 && o.id === 4));
+
+        function renderRows() {
+            document.getElementById('rows').innerHTML = M.menus.map(m => {
+                const a = avail(m.id);
+                return `<tr onclick="sel=${m.id};render()" class="border-t border-stone-100 cursor-pointer ${sel === m.id ? 'bg-brand-50' : 'hover:bg-stone-50'}">
+                    <td class="px-4 py-2.5"><div class="flex items-center gap-3"><span class="w-9 h-9 rounded-lg ${m.color} grid place-items-center text-lg">${m.emoji}</span><b>${m.name}</b>${m.soldOut ? '<span class="text-[10px] bg-red-100 text-red-600 px-1.5 rounded font-bold">HABIS</span>' : ''}</div></td>
+                    <td class="px-4 py-2.5 capitalize">${M.categories.find(c => c.id === m.cat).name}</td>
+                    <td class="px-4 py-2.5">${m.station}</td>
+                    <td class="px-4 py-2.5 text-right font-semibold whitespace-nowrap">${rp(m.price)}</td>
+                    <td class="px-4 py-2.5 text-xs text-stone-500">${m.mods.map(g => M.modifierGroups[g].name).join(', ') || '-'}</td>
+                    <td class="px-4 py-2.5"><div class="flex gap-1">${M.outlets.map((o, i) => `<span title="${o.name}" class="w-6 h-6 rounded-md text-[10px] font-bold grid place-items-center ${a[i] ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-300'}">${o.name[0]}</span>`).join('')}</div></td></tr>`;
+            }).join('');
+        }
+
+        function renderEditor() {
+            const m = M.menus.find(x => x.id === sel), a = avail(m.id);
+            const tabs = [['info', 'Info'], ['mod', 'Modifier'], ['outlet', 'Per Outlet'], ['channel', 'Channel'], ['resep', 'Resep']];
+            let body = '';
+            if (tab === 'info') body = `
+                <div class="${m.color} rounded-2xl h-36 grid place-items-center text-6xl">${m.emoji}</div>
+                <label class="block"><span class="text-xs text-stone-500">Nama menu</span><input value="${m.name}" class="mt-1 w-full px-3 py-2 rounded-xl border border-stone-200"></label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="block"><span class="text-xs text-stone-500">Harga dasar</span><input value="${m.price.toLocaleString('id-ID')}" class="mt-1 w-full px-3 py-2 rounded-xl border border-stone-200"></label>
+                    <label class="block"><span class="text-xs text-stone-500">SKU</span><input value="MN-${String(m.id).padStart(4, '0')}" class="mt-1 w-full px-3 py-2 rounded-xl border border-stone-200"></label>
+                    <label class="block"><span class="text-xs text-stone-500">Kategori</span><select class="mt-1 w-full px-3 py-2 rounded-xl border border-stone-200">${M.categories.slice(1).map(c => `<option ${c.id === m.cat ? 'selected' : ''}>${c.name}</option>`).join('')}</select></label>
+                    <label class="block"><span class="text-xs text-stone-500">Stasiun produksi</span><select class="mt-1 w-full px-3 py-2 rounded-xl border border-stone-200">${['Dapur', 'Bar', 'Pastry'].map(s => `<option ${s === m.station ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+                </div>`;
+            if (tab === 'mod') body = `<div class="text-xs text-stone-500">Grup modifier yang terpasang (urutan tampil di kasir):</div>` +
+                (m.mods.map(g => { const grp = M.modifierGroups[g]; return `<div class="rounded-xl border border-stone-200 p-3"><div class="flex justify-between"><b>${grp.name}</b><span class="text-xs text-stone-500">${grp.required ? 'Wajib' : 'Opsional'} · maks ${grp.max}</span></div>
+                    <div class="flex flex-wrap gap-1 mt-2">${grp.options.map(o => `<span class="text-xs px-2 py-1 rounded-lg bg-stone-100">${o.name}${o.price ? ' +' + (o.price / 1000) + 'k' : ''}</span>`).join('')}</div></div>`; }).join('') || '<div class="text-stone-400 text-sm">Belum ada modifier</div>') +
+                `<button class="w-full py-2.5 rounded-xl border-2 border-dashed border-stone-300 text-sm font-semibold text-stone-500"><i class="fas fa-plus mr-1"></i>Pasang Grup Modifier</button>`;
+            if (tab === 'outlet') body = `<div class="text-xs text-stone-500">Kosongkan harga untuk memakai harga dasar (${rp(m.price)}).</div>` + M.outlets.map((o, i) => `
+                <div class="rounded-xl border border-stone-200 p-3 flex items-center gap-3">
+                    <div class="flex-1"><b>${o.name}</b><div class="text-xs text-stone-400">${o.city}</div></div>
+                    <input placeholder="${(m.price).toLocaleString('id-ID')}" value="${o.id === 2 ? (m.price + 3000).toLocaleString('id-ID') : ''}" class="w-28 px-2 py-1.5 rounded-lg border border-stone-200 text-right text-sm">
+                    <label class="flex items-center gap-1 text-xs"><input type="checkbox" ${a[i] ? 'checked' : ''} class="accent-orange-500 w-4 h-4">Aktif</label>
+                </div>`).join('') + `<div class="text-xs text-stone-500"><i class="fas fa-circle-info mr-1"></i>Status "Habis hari ini" diatur langsung dari kasir masing-masing outlet.</div>`;
+            if (tab === 'channel') body = `<div class="text-xs text-stone-500">Harga khusus per channel penjualan (berlaku semua outlet).</div>` + [['Dine-in', 0], ['Take Away', 0], ['GoFood', 25], ['GrabFood', 25], ['ShopeeFood', 20]].map(c => `
+                <div class="rounded-xl border border-stone-200 p-3 flex items-center gap-3"><b class="flex-1">${c[0]}</b>
+                    <span class="text-xs text-stone-500">markup</span><input value="${c[1]}" class="w-14 px-2 py-1.5 rounded-lg border border-stone-200 text-right text-sm">%
+                    <span class="w-24 text-right font-semibold">${rp(Math.ceil(m.price * (1 + c[1] / 100) / 500) * 500)}</span></div>`).join('');
+            if (tab === 'resep') body = `<div class="text-xs text-stone-500">Bahan dipotong otomatis dari stok outlet saat terjual (Fase 2).</div>
+                <table class="w-full text-sm"><thead class="text-xs text-stone-500"><tr><th class="text-left py-1">Bahan</th><th class="text-right">Takaran</th><th class="text-right">HPP</th></tr></thead><tbody>
+                ${[['Espresso blend', '18 g', 3600], ['Susu UHT', '150 ml', 2700], ['Gula aren cair', '25 ml', 1500], ['Es batu', '120 g', 300], ['Cup 16oz + lid', '1 pcs', 1400]].map(r => `<tr class="border-t border-stone-100"><td class="py-2">${r[0]}</td><td class="text-right">${r[1]}</td><td class="text-right">${rp(r[2])}</td></tr>`).join('')}
+                </tbody></table>
+                <div class="rounded-xl bg-emerald-50 p-3 text-sm flex justify-between"><span>HPP ${rp(9500)} · Harga ${rp(m.price)}</span><b class="text-emerald-700">Margin ${Math.round((1 - 9500 / m.price) * 100)}%</b></div>`;
+
+            document.getElementById('editor').innerHTML = `
+                <div class="p-4 border-b border-stone-200"><div class="font-bold text-lg">${m.name}</div><div class="text-xs text-stone-500">Master menu · berlaku untuk semua outlet</div>
+                    <div class="flex gap-1 mt-3 text-sm font-medium">${tabs.map(t => `<button onclick="tab='${t[0]}';renderEditor()" class="px-3 py-1.5 rounded-lg ${tab === t[0] ? 'bg-brand-500 text-white' : 'text-stone-500 hover:bg-stone-100'}">${t[1]}</button>`).join('')}</div></div>
+                <div class="flex-1 overflow-y-auto thin-scroll p-4 space-y-3">${body}</div>
+                <div class="p-4 border-t border-stone-200 flex gap-2"><button class="px-4 py-2.5 rounded-xl bg-red-50 text-red-600 font-semibold text-sm"><i class="fas fa-trash"></i></button>
+                    <button onclick="toast('Tersimpan & disinkronkan ke ${M.outlets.length} outlet')" class="flex-1 py-2.5 rounded-xl bg-brand-500 text-white font-bold">Simpan</button></div>`;
+        }
+
+        function render() { renderRows(); renderEditor(); }
+        let toastT;
+        function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.add('hidden'), 2400); }
+        render();
+    </script>
+</body>
+</html>

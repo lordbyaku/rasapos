@@ -1,0 +1,4 @@
+# Salin menjadi .dev.vars untuk development lokal. Di produksi gunakan `npx wrangler secret put <NAMA>`.
+JWT_SECRET=ganti-dengan-string-acak-minimal-32-karakter
+# Opsional: email reset password via Resend
+RESEND_API_KEY=

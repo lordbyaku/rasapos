@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1c1917">
+    <title>Back Office — RasaPOS</title>
+    <link rel="icon" href="/icons/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+</head>
+<body class="h-screen overflow-hidden">
+    <div class="flex h-full">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full lg:translate-x-0 lg:static bg-stone-900 text-stone-300 flex flex-col shrink-0 transition-transform">
+            <div class="h-16 flex items-center gap-3 px-4 border-b border-stone-800">
+                <div class="w-9 h-9 rounded-xl bg-brand-500 text-white grid place-items-center font-extrabold">R</div>
+                <div class="leading-tight min-w-0">
+                    <div id="tenant-name" class="font-bold text-white text-sm truncate">RasaPOS</div>
+                    <div id="user-role" class="text-[11px] text-stone-500">Back Office</div>
+                </div>
+            </div>
+            <nav id="nav" class="p-3 space-y-0.5 flex-1 overflow-y-auto no-scrollbar"></nav>
+            <div class="p-3 border-t border-stone-800 text-xs space-y-2">
+                <div id="license-box" class="bg-stone-800 rounded-lg p-3"></div>
+                <button id="btn-logout" class="nav-item w-full"><i class="fas fa-right-from-bracket w-4"></i>Keluar</button>
+            </div>
+        </aside>
+        <div id="sidebar-backdrop" class="fixed inset-0 z-30 bg-black/40 hidden lg:hidden"></div>
+
+        <div class="flex-1 flex flex-col min-w-0">
+            <header class="h-16 bg-white border-b border-stone-200 flex items-center px-4 gap-3 shrink-0">
+                <button id="btn-menu" class="lg:hidden w-10 h-10 rounded-lg hover:bg-stone-100"><i class="fas fa-bars"></i></button>
+                <h1 id="page-title" class="text-lg font-bold truncate">Dashboard</h1>
+                <div id="header-tools" class="flex items-center gap-2 ml-2 flex-wrap"></div>
+                <div class="ml-auto flex items-center gap-2">
+                    <span id="rt-status" class="badge bg-stone-100 text-stone-500"><i class="fas fa-circle text-[7px] mr-1"></i>Offline</span>
+                    <div id="user-avatar" class="w-9 h-9 rounded-full bg-brand-100 text-brand-700 grid place-items-center font-bold text-sm"></div>
+                </div>
+            </header>
+            <div id="license-banner" class="hidden"></div>
+            <main id="view" class="flex-1 overflow-y-auto thin-scroll p-4 lg:p-6"></main>
+        </div>
+    </div>
+
+    <!-- Modal form generik -->
+    <div id="bo-modal" class="hidden fixed inset-0 z-50 modal-bg items-center justify-center p-4">
+        <div id="bo-modal-box" class="bg-white rounded-2xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-stone-200 flex items-center gap-3">
+                <h3 id="bo-modal-title" class="font-bold flex-1"></h3>
+                <button data-close class="w-9 h-9 rounded-lg hover:bg-stone-100"><i class="fas fa-xmark"></i></button>
+            </div>
+            <form id="bo-modal-form" class="flex-1 overflow-y-auto thin-scroll p-4 space-y-3"></form>
+            <div id="bo-modal-foot" class="p-4 border-t border-stone-200 flex gap-2 justify-end"></div>
+        </div>
+    </div>
+
+    <!-- Drawer detail -->
+    <div id="bo-drawer" class="hidden fixed inset-0 z-50 modal-bg">
+        <div class="absolute right-0 top-0 h-full w-full max-w-md bg-white flex flex-col">
+            <div class="p-4 border-b border-stone-200 flex items-center"><h3 id="bo-drawer-title" class="font-bold flex-1"></h3><button data-close class="w-9 h-9 rounded-lg hover:bg-stone-100"><i class="fas fa-xmark"></i></button></div>
+            <div id="bo-drawer-body" class="flex-1 overflow-y-auto thin-scroll p-4 text-sm"></div>
+            <div id="bo-drawer-foot" class="p-4 border-t border-stone-200 flex gap-2"></div>
+        </div>
+    </div>
+
+    <div id="print-area"></div>
+
+    <script src="/vendor/sweetalert2.all.min.js"></script>
+    <script src="/vendor/chart.umd.js"></script>
+    <script src="/js/shared/money.js"></script>
+    <script src="/js/shared/order-ops.js"></script>
+    <script src="/js/shared/pricing.js"></script>
+    <script src="/js/core/utils.js"></script>
+    <script src="/js/core/api.js"></script>
+    <script src="/js/core/realtime.js"></script>
+    <script src="/js/core/pwa.js"></script>
+    <script src="/js/core/escpos.js"></script>
+    <script src="/js/core/receipt.js"></script>
+    <script src="/js/core/printer.js"></script>
+    <script src="/js/backoffice/app.js"></script>
+    <script src="/js/backoffice/dashboard.js"></script>
+    <script src="/js/backoffice/transactions.js"></script>
+    <script src="/js/backoffice/reports.js"></script>
+    <script src="/js/backoffice/menu.js"></script>
+    <script src="/js/backoffice/outlets.js"></script>
+    <script src="/js/backoffice/staff.js"></script>
+    <script src="/js/backoffice/inventory.js"></script>
+    <script src="/js/backoffice/marketing.js"></script>
+    <script src="/js/backoffice/settings.js"></script>
+    <script>BO.start();</script>
+</body>
+</html>

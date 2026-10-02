@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Superadmin — RasaPOS</title>
+    <link rel="icon" href="/icons/favicon-32.png">
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+</head>
+<body class="min-h-screen">
+    <header class="h-16 bg-stone-900 text-white flex items-center px-5 gap-3">
+        <div class="w-9 h-9 rounded-xl bg-brand-500 grid place-items-center font-extrabold">R</div>
+        <div class="leading-tight"><div class="font-bold">RasaPOS Superadmin</div><div id="a-user" class="text-[11px] text-stone-400"></div></div>
+        <div class="ml-auto flex gap-2"><a href="/backoffice.html" class="btn bg-stone-800 text-stone-200 hover:bg-stone-700" id="a-bo"><i class="fas fa-store"></i>Back office saya</a><button id="a-logout" class="btn bg-stone-800 text-stone-200 hover:bg-stone-700"><i class="fas fa-right-from-bracket"></i>Keluar</button></div>
+    </header>
+    <main class="max-w-7xl mx-auto p-5">
+        <div id="a-summary" class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3"></div>
+        <div class="flex flex-wrap gap-2 my-4">
+            <div class="relative flex-1 min-w-[220px]"><i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"></i><input id="a-q" class="input pl-9" placeholder="Cari usaha / email pemilik…"></div>
+            <select id="a-state" class="input !w-auto"><option value="">Semua status</option><option value="trial">Trial</option><option value="active">Aktif</option><option value="grace">Masa tenggang</option><option value="expired">Kedaluwarsa</option><option value="suspended">Ditangguhkan</option></select>
+        </div>
+        <div class="card overflow-hidden"><div class="overflow-x-auto"><table class="tbl whitespace-nowrap"><thead><tr><th>#</th><th>Usaha</th><th>Pemilik</th><th>Status</th><th>Berlaku s/d</th><th class="text-right">Paket</th><th class="text-right">Outlet</th><th class="text-right">Perangkat</th><th class="text-right">Trx 30 hari</th><th class="text-right">Omzet 30 hari</th><th></th></tr></thead><tbody id="a-rows"></tbody></table></div></div>
+    </main>
+    <div id="a-drawer" class="hidden fixed inset-0 z-50 modal-bg"><div class="absolute right-0 top-0 h-full w-full max-w-xl bg-white flex flex-col">
+        <div class="p-4 border-b border-stone-200 flex items-center"><h3 id="a-d-title" class="font-bold flex-1"></h3><button data-close class="w-9 h-9 rounded-lg hover:bg-stone-100"><i class="fas fa-xmark"></i></button></div>
+        <div id="a-d-body" class="flex-1 overflow-y-auto thin-scroll p-4 text-sm"></div></div></div>
+    <script src="/vendor/sweetalert2.all.min.js"></script>
+    <script src="/js/core/utils.js"></script>
+    <script src="/js/core/api.js"></script>
+    <script src="/js/admin/app.js"></script>
+</body>
+</html>

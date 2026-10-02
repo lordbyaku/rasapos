@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulasi Limit Free Tier — RasaPOS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="assets/style.css">
+    <style>input[type=range] { accent-color: #f97316; width: 100%; }</style>
+</head>
+<body class="bg-stone-100 text-stone-800 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <div class="flex items-center gap-3 flex-wrap">
+            <a href="index.html" class="w-10 h-10 rounded-xl bg-orange-500 text-white grid place-items-center font-extrabold">R</a>
+            <div>
+                <h1 class="text-xl font-extrabold">Simulasi Limit: Supabase Free + Vercel Hobby</h1>
+                <p class="text-sm text-stone-500">Kuota per Oktober 2026 (supabase.com/pricing, vercel.com/docs/plans/hobby). Angka ukuran data adalah <b>estimasi</b>, cek ulang dengan data nyata saat pilot.</p>
+            </div>
+        </div>
+
+        <div class="grid lg:grid-cols-[340px_1fr] gap-5 mt-5">
+            <!-- INPUT -->
+            <aside class="bg-white rounded-2xl border border-stone-200 p-4 space-y-4 h-fit lg:sticky lg:top-4">
+                <h2 class="font-bold">Asumsi</h2>
+                <div id="inputs" class="space-y-4 text-sm"></div>
+                <label class="flex items-start gap-2 text-sm"><input id="inv" type="checkbox" class="mt-1 accent-orange-500 w-4 h-4" onchange="calc()"><span><b>Modul inventori/resep aktif</b><br><span class="text-stone-500">tiap item memotong ±4 bahan</span></span></label>
+                <label class="flex items-start gap-2 text-sm"><input id="opt" type="checkbox" checked class="mt-1 accent-orange-500 w-4 h-4" onchange="calc()"><span><b>Pakai optimasi</b> (direkomendasikan di PLAN)<br><span class="text-stone-500">mutasi stok diagregasi per order, SW cache-first, cek versi 30 mnt, sync menu delta, dashboard dari tabel ringkasan, realtime hemat</span></span></label>
+                <div class="flex gap-2 text-xs">
+                    <button onclick="preset(1,100)" class="flex-1 py-2 rounded-lg bg-stone-100">Pilot 1 outlet</button>
+                    <button onclick="preset(5,150)" class="flex-1 py-2 rounded-lg bg-stone-100">1 paket (5)</button>
+                    <button onclick="preset(20,150)" class="flex-1 py-2 rounded-lg bg-stone-100">4 paket (20)</button>
+                </div>
+            </aside>
+
+            <!-- OUTPUT -->
+            <main class="space-y-5 min-w-0">
+                <div id="verdict" class="rounded-2xl p-5 text-white"></div>
+
+                <section class="bg-white rounded-2xl border border-stone-200 p-4">
+                    <div class="flex items-center justify-between"><h3 class="font-bold">Pertumbuhan ukuran database (kumulatif)</h3><span class="text-xs text-stone-500">Free = 500 MB → masuk <b>read-only</b> (INSERT gagal = kasir tidak bisa transaksi)</span></div>
+                    <div class="h-64 mt-2"><canvas id="ch-db"></canvas></div>
+                </section>
+
+                <section class="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+                    <div class="p-4"><h3 class="font-bold">Pemakaian per kuota (per bulan)</h3><p class="text-xs text-stone-500">Kuota bulanan reset tiap bulan → yang dibatasi adalah <b>jumlah outlet</b>. Database size bersifat kumulatif → yang dibatasi adalah <b>waktu</b>.</p></div>
+                    <div class="overflow-x-auto"><table class="w-full text-sm whitespace-nowrap">
+                        <thead class="bg-stone-50 text-xs uppercase text-stone-500"><tr><th class="text-left px-4 py-2">Layanan / Kuota</th><th class="text-right px-4 py-2">Pemakaian</th><th class="text-right px-4 py-2">Limit</th><th class="px-4 py-2 w-56">Terpakai</th><th class="text-right px-4 py-2">Maks. outlet*</th><th class="text-left px-4 py-2">Jika lewat</th></tr></thead>
+                        <tbody id="rows"></tbody>
+                    </table></div>
+                    <p class="p-4 text-xs text-stone-500">* Kapasitas outlet dengan asumsi yang sama. Untuk database: berapa outlet yang bisa jalan 12 bulan sebelum penuh.</p>
+                </section>
+
+                <section class="grid md:grid-cols-2 gap-4 text-sm">
+                    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+                        <h3 class="font-bold mb-2">Rincian per transaksi</h3>
+                        <div id="per-trx" class="space-y-1"></div>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+                        <h3 class="font-bold mb-2">Catatan penting</h3>
+                        <ul class="list-disc pl-5 space-y-1.5 text-stone-600">
+                            <li><b>Vercel Hobby hanya untuk non-komersial.</b> SaaS berbayar melanggar fair use, dan jika kuota habis situs berhenti sampai 30 hari. Alternatif gratis yang boleh komersial: Cloudflare Pages.</li>
+                            <li><b>Supabase Free tanpa backup otomatis</b> dan tanpa SLA. Wajib backup sendiri (pg_dump harian) sebelum ada tenant berbayar.</li>
+                            <li>Proyek Free di-pause setelah 1 minggu tanpa aktivitas, tapi POS yang dipakai harian tidak akan kena.</li>
+                            <li>Upgrade Supabase Pro ($25/bln): 8 GB DB, 250 GB egress, 500 koneksi realtime, 5 juta pesan, backup harian.</li>
+                        </ul>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        const IN = [
+            ['outlets', 'Jumlah outlet aktif (total semua tenant)', 1, 60, 5, 1, ''],
+            ['trx', 'Transaksi / hari / outlet', 20, 600, 150, 10, ''],
+            ['items', 'Item rata-rata / transaksi', 1, 10, 3.5, 0.5, ''],
+            ['dine', 'Porsi dine-in', 0, 100, 60, 5, '%'],
+            ['devices', 'Perangkat per outlet (kasir+waiter+KDS)', 1, 8, 3, 1, ''],
+            ['hours', 'Jam buka / hari', 6, 24, 14, 1, ' jam'],
+            ['opens', 'App dibuka ulang / perangkat / hari', 1, 20, 4, 1, 'x'],
+            ['dash', 'Owner buka dashboard / hari / tenant', 1, 50, 10, 1, 'x']
+        ];
+        const V = {};
+        document.getElementById('inputs').innerHTML = IN.map(([k, l, mn, mx, d, st, u]) => {
+            V[k] = d;
+            return `<div><div class="flex justify-between"><span>${l}</span><b id="v-${k}">${d}${u}</b></div>
+                <input type="range" min="${mn}" max="${mx}" step="${st}" value="${d}" id="i-${k}" oninput="V.${k}=+this.value;document.getElementById('v-${k}').textContent=this.value+'${u}';calc()"></div>`;
+        }).join('');
+
+        function preset(o, t) {
+            [['outlets', o], ['trx', t]].forEach(([k, v]) => { V[k] = v; document.getElementById('i-' + k).value = v; document.getElementById('v-' + k).textContent = v; });
+            calc();
+        }
+
+        const MB = 1024 * 1024, KB = 1024, GB = 1024 * MB;
+        const fmtB = b => b >= GB ? (b / GB).toFixed(2) + ' GB' : b >= MB ? (b / MB).toFixed(1) + ' MB' : (b / KB).toFixed(1) + ' KB';
+        const fmtN = n => n >= 1e6 ? (n / 1e6).toFixed(2) + ' jt' : n >= 1e3 ? (n / 1e3).toFixed(1) + ' rb' : Math.round(n).toString();
+
+        let chart;
+        function calc() {
+            const inv = document.getElementById('inv').checked, opt = document.getElementById('opt').checked;
+            const { outlets, trx, items, dine, devices, hours, opens, dash } = V;
+            const tenants = Math.ceil(outlets / 5);
+            const trxMonth = outlets * trx * 30;
+
+            // ---------- DATABASE (byte per transaksi, sebelum index) ----------
+            const tickets = 1.8;
+            const rowsB = {
+                'Order (fnb_orders)': 600,
+                'Item order (+modifier JSONB)': items * 350,
+                'Pembayaran': 1.1 * 200,
+                'Tiket dapur + item tiket': tickets * 180 + items * 120,
+                'Audit log (void/diskon)': 30,
+                'Mutasi stok bahan': inv ? (opt ? Math.min(items * 4, 10) * 160 : items * 4 * 160) : 0
+            };
+            const raw = Object.values(rowsB).reduce((a, b) => a + b, 0);
+            const OVERHEAD = 1.6 * 1.15; // index ±60% + bloat MVCC ±15%
+            const perTrxDB = raw * OVERHEAD;
+            const baseline = 25 * MB + tenants * 1 * MB; // skema sistem Supabase + master data
+            const dbMonth = trxMonth * perTrxDB;
+            const dbLimit = 500 * MB;
+            const monthsLeft = (dbLimit - baseline) / dbMonth;
+
+            // ---------- REALTIME ----------
+            const recvKitchen = opt ? 1.5 : devices;
+            const msgKitchen = tickets * 3 * (1 + recvKitchen);
+            const msgTable = (dine / 100) * 3 * (1 + Math.max(devices - 1, 1));
+            const msgSale = 1.5;
+            const msgPerTrx = msgKitchen + msgTable + msgSale;
+            const msgMonth = trxMonth * msgPerTrx;
+            const connPeak = outlets * devices + tenants;
+
+            // ---------- EGRESS SUPABASE ----------
+            const apiPerTrx = (opt ? 4 : 8) * KB;
+            const rtPerTrx = msgPerTrx * 0.4 * KB;
+            const syncMonth = outlets * devices * opens * (opt ? 20 : 150) * KB * 30;
+            const dashMonth = tenants * dash * (opt ? 60 : 400) * KB * 30;
+            const exportMonth = trxMonth * 1.5 * KB;
+            const egressMonth = trxMonth * (apiPerTrx + rtPerTrx) + syncMonth + dashMonth + exportMonth;
+
+            // ---------- STORAGE (foto menu) ----------
+            const storage = tenants * 150 * 60 * KB;
+            const cachedEgress = (outlets * devices + tenants) * 150 * 60 * KB * 2;
+
+            // ---------- VERCEL ----------
+            const devTotal = outlets * devices + tenants;
+            const polls = hours * 60 / (opt ? 30 : 5);
+            const reqDay = opens * (opt ? 3 : 30) + polls;
+            const xferDay = opens * (opt ? 15 : 450) * KB + polls * 0.4 * KB;
+            const vReq = devTotal * reqDay * 30, vXfer = devTotal * xferDay * 30;
+
+            const perOutlet = (usage) => usage / outlets;
+            const cap = (limit, usage) => Math.floor(limit / perOutlet(usage));
+
+            const rows = [
+                ['Supabase', 'Ukuran database (pertumbuhan/bulan)', fmtB(dbMonth) + '/bln', '500 MB total', (baseline + dbMonth) / dbLimit, Math.floor((dbLimit - baseline) / (dbMonth / outlets * 12)), 'Read-only → transaksi gagal', monthsLeft],
+                ['Supabase', 'Egress', fmtB(egressMonth), '5 GB', egressMonth / (5 * GB), cap(5 * GB, egressMonth), 'Pembatasan layanan (fair use)'],
+                ['Supabase', 'Pesan realtime', fmtN(msgMonth), '2 jt', msgMonth / 2e6, cap(2e6, msgMonth), 'Realtime dibatasi (KDS/meja tidak update)'],
+                ['Supabase', 'Koneksi realtime puncak', connPeak, '200', connPeak / 200, Math.floor((200 - tenants) / devices), 'Koneksi baru ditolak'],
+                ['Supabase', 'Storage foto menu', fmtB(storage), '1 GB', storage / GB, Math.floor(GB / (150 * 60 * KB)) * 5, 'Upload gagal'],
+                ['Supabase', 'Cached egress (foto)', fmtB(cachedEgress), '5 GB', cachedEgress / (5 * GB), cap(5 * GB, cachedEgress), 'Pembatasan layanan'],
+                ['Supabase', 'MAU (owner + perangkat)', devTotal, '50.000', devTotal / 50000, '>1000', '-'],
+                ['Vercel', 'CDN requests', fmtN(vReq), '1 jt', vReq / 1e6, cap(1e6, vReq), 'Situs berhenti s/d 30 hari'],
+                ['Vercel', 'Fast Data Transfer', fmtB(vXfer), '100 GB', vXfer / (100 * GB), cap(100 * GB, vXfer), 'Situs berhenti s/d 30 hari']
+            ];
+
+            document.getElementById('rows').innerHTML = rows.map(r => {
+                const p = Math.min(r[4] * 100, 100);
+                const col = r[4] >= 1 ? 'bg-red-500' : r[4] >= .7 ? 'bg-amber-500' : 'bg-emerald-500';
+                return `<tr class="border-t border-stone-100">
+                    <td class="px-4 py-2.5"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${r[0] === 'Vercel' ? 'bg-stone-900 text-white' : 'bg-emerald-100 text-emerald-800'}">${r[0]}</span> ${r[1]}</td>
+                    <td class="px-4 py-2.5 text-right font-semibold">${r[2]}</td><td class="px-4 py-2.5 text-right text-stone-500">${r[3]}</td>
+                    <td class="px-4 py-2.5"><div class="h-2.5 bg-stone-100 rounded-full"><div class="h-2.5 rounded-full ${col}" style="width:${p}%"></div></div>
+                        <div class="text-[11px] text-stone-500 mt-0.5">${(r[4] * 100).toFixed(r[4] < .01 ? 2 : 0)}%${r[7] ? ' · penuh dalam ' + (r[7] > 0 ? r[7].toFixed(1) + ' bulan' : 'sudah penuh') : ''}</div></td>
+                    <td class="px-4 py-2.5 text-right font-semibold">${r[5]}</td><td class="px-4 py-2.5 text-xs text-stone-500">${r[6]}</td></tr>`;
+            }).join('');
+
+            // per transaksi
+            document.getElementById('per-trx').innerHTML =
+                Object.entries(rowsB).map(([k, v]) => `<div class="flex justify-between"><span class="text-stone-500">${k}</span><span>${v ? fmtB(v) : '-'}</span></div>`).join('') +
+                `<div class="flex justify-between border-t border-stone-100 pt-1"><span class="text-stone-500">+ index &amp; bloat (×${OVERHEAD.toFixed(2)})</span><b>${fmtB(perTrxDB)}</b></div>
+                 <div class="flex justify-between"><span class="text-stone-500">Pesan realtime / transaksi</span><b>${msgPerTrx.toFixed(1)}</b></div>
+                 <div class="flex justify-between"><span class="text-stone-500">Egress / transaksi (API + realtime)</span><b>${fmtB(apiPerTrx + rtPerTrx)}</b></div>
+                 <div class="flex justify-between"><span class="text-stone-500">Transaksi / bulan (semua outlet)</span><b>${fmtN(trxMonth)}</b></div>`;
+
+            // verdict: limit bulanan yang terlewati, atau waktu sampai DB penuh
+            const monthly = rows.slice(1).filter(r => r[4] >= 1);
+            const v = document.getElementById('verdict');
+            const months = Math.max(monthsLeft, 0);
+            if (monthly.length) {
+                v.className = 'rounded-2xl p-5 text-white bg-red-600';
+                v.innerHTML = `<div class="text-sm opacity-90">Langsung kena limit di bulan pertama</div><div class="text-2xl font-extrabold">${monthly.map(r => r[0] + ' ' + r[1]).join(', ')}</div>
+                    <div class="text-sm mt-1 opacity-90">Database sendiri penuh dalam ±${months.toFixed(1)} bulan.</div>`;
+            } else {
+                v.className = 'rounded-2xl p-5 text-white ' + (months < 3 ? 'bg-red-600' : months < 9 ? 'bg-amber-500' : 'bg-emerald-600');
+                v.innerHTML = `<div class="text-sm opacity-90">Limit pertama yang tercapai: <b>Ukuran database Supabase (500 MB)</b></div>
+                    <div class="text-3xl font-extrabold">± ${months.toFixed(1)} bulan <span class="text-lg font-semibold opacity-90">(${(months * 30).toFixed(0)} hari)</span></div>
+                    <div class="text-sm mt-1 opacity-90">${outlets} outlet × ${trx} trx/hari${inv ? ' · inventori aktif' : ''}. Kuota bulanan lain masih aman. Batas tertinggi lainnya: ${rows.slice(1).sort((a, b) => b[4] - a[4])[0][1]} (${(rows.slice(1).sort((a, b) => b[4] - a[4])[0][4] * 100).toFixed(0)}%).</div>`;
+            }
+
+            // chart pertumbuhan DB
+            const labels = Array.from({ length: 25 }, (_, i) => 'Bln ' + i);
+            const data = labels.map((_, i) => +((baseline + dbMonth * i) / MB).toFixed(1));
+            if (chart) chart.destroy();
+            chart = new Chart(document.getElementById('ch-db'), {
+                type: 'line',
+                data: { labels, datasets: [
+                    { label: 'Ukuran DB (MB)', data, borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,.12)', fill: true, tension: .2, pointRadius: 0 },
+                    { label: 'Limit Free 500 MB', data: labels.map(() => 500), borderColor: '#ef4444', borderDash: [6, 4], pointRadius: 0 }
+                ] },
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } }, scales: { y: { suggestedMax: 600, ticks: { callback: v => v + ' MB' } } } }
+            });
+        }
+        calc();
+    </script>
+</body>
+</html>

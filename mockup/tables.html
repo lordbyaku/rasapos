@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meja — RasaPOS (Mockup)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/style.css">
+    <script>tailwind.config = { theme: { extend: { colors: { brand: { 50: '#fff7ed', 100: '#ffedd5', 500: '#f97316', 600: '#ea580c', 700: '#c2410c' } } } } };</script>
+</head>
+<body class="bg-stone-100 text-stone-800 h-screen overflow-hidden flex flex-col">
+
+    <header class="h-14 bg-white border-b border-stone-200 flex items-center px-3 gap-3 shrink-0">
+        <a href="index.html" class="w-9 h-9 rounded-xl bg-brand-500 text-white grid place-items-center font-extrabold">R</a>
+        <div class="leading-tight">
+            <div class="font-bold text-sm">Outlet Sudirman</div>
+            <div class="text-[11px] text-stone-500">Kopi &amp; Makan Nusantara · Kasir-01</div>
+        </div>
+        <nav class="ml-4 flex bg-stone-100 rounded-xl p-1 text-sm font-medium">
+            <a href="pos.html" class="px-3 py-1.5 rounded-lg text-stone-600 hover:text-stone-900"><i class="fas fa-cash-register mr-1.5"></i>Kasir</a>
+            <a href="tables.html" class="px-3 py-1.5 rounded-lg bg-white shadow-sm text-brand-600"><i class="fas fa-chair mr-1.5"></i>Meja</a>
+            <a href="kds.html" class="px-3 py-1.5 rounded-lg text-stone-600 hover:text-stone-900"><i class="fas fa-fire-burner mr-1.5"></i>Dapur</a>
+        </nav>
+        <div class="ml-auto flex items-center gap-2 text-xs">
+            <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold"><i class="fas fa-circle text-[7px] mr-1 align-middle"></i>Online</span>
+            <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-700 grid place-items-center font-bold">RN</div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex min-h-0">
+        <main class="flex-1 flex flex-col min-w-0 p-4">
+            <div class="flex items-center gap-3 flex-wrap">
+                <div id="areas" class="flex bg-white rounded-xl p-1 border border-stone-200 text-sm font-semibold"></div>
+                <div id="legend" class="flex gap-3 text-xs text-stone-600 flex-wrap"></div>
+                <div class="ml-auto flex gap-2 text-sm">
+                    <div class="bg-white border border-stone-200 rounded-xl px-3 py-2"><b id="occ"></b> terisi</div>
+                    <button class="bg-white border border-stone-200 rounded-xl px-3 py-2"><i class="fas fa-calendar-check mr-1"></i>Reservasi</button>
+                    <button class="bg-white border border-stone-200 rounded-xl px-3 py-2"><i class="fas fa-pen-ruler mr-1"></i>Atur Denah</button>
+                </div>
+            </div>
+            <div id="floor" class="flex-1 mt-4 overflow-y-auto thin-scroll grid grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-4 content-start"></div>
+        </main>
+
+        <aside id="detail" class="w-[360px] bg-white border-l border-stone-200 flex flex-col shrink-0"></aside>
+    </div>
+
+    <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-stone-900 text-white px-4 py-2.5 rounded-xl text-sm z-[60]"></div>
+
+    <script src="assets/data.js"></script>
+    <script>
+        const M = window.MOCK;
+        const STATUS = {
+            empty: { label: 'Kosong', card: 'bg-white border-stone-200', dot: 'bg-stone-300', text: 'text-stone-400' },
+            seated: { label: 'Terisi, belum pesan', card: 'bg-sky-50 border-sky-300', dot: 'bg-sky-500', text: 'text-sky-700' },
+            ordered: { label: 'Sudah pesan', card: 'bg-brand-50 border-brand-500', dot: 'bg-brand-500', text: 'text-brand-700' },
+            bill: { label: 'Minta bill', card: 'bg-red-50 border-red-500 pulse-red', dot: 'bg-red-500', text: 'text-red-600' },
+            dirty: { label: 'Perlu dibersihkan', card: 'bg-stone-200 border-stone-300', dot: 'bg-stone-500', text: 'text-stone-500' }
+        };
+        let area = 'Indoor', selected = 'A3';
+
+        document.getElementById('legend').innerHTML = Object.values(STATUS).map(s => `<span><i class="inline-block w-2.5 h-2.5 rounded-full ${s.dot} mr-1"></i>${s.label}</span>`).join('');
+
+        function render() {
+            document.getElementById('areas').innerHTML = M.areas.map(a => `<button onclick="area='${a}';render()" class="px-4 py-1.5 rounded-lg ${area === a ? 'bg-brand-500 text-white' : 'text-stone-600'}">${a}</button>`).join('');
+            const list = M.tables.filter(t => t.area === area);
+            document.getElementById('occ').textContent = `${M.tables.filter(t => !['empty', 'dirty'].includes(t.status)).length}/${M.tables.length}`;
+            document.getElementById('floor').innerHTML = list.map(t => {
+                const s = STATUS[t.status];
+                const big = t.cap >= 6;
+                return `<button onclick="selected='${t.name}';render()" class="tap relative rounded-2xl border-2 ${s.card} ${big ? 'col-span-2' : ''} p-3 h-36 text-left flex flex-col ${selected === t.name ? 'ring-4 ring-stone-800/20' : ''}">
+                    <div class="flex items-start justify-between">
+                        <span class="text-2xl font-extrabold">${t.name}</span>
+                        <span class="text-xs text-stone-500"><i class="fas fa-user"></i> ${t.guests ? t.guests + '/' : ''}${t.cap}</span>
+                    </div>
+                    <div class="text-xs font-semibold ${s.text}">${s.label}</div>
+                    ${t.mins !== undefined ? `<div class="mt-auto flex items-end justify-between">
+                        <div class="text-xs ${t.mins > 60 ? 'text-red-600 font-bold' : 'text-stone-500'}"><i class="fas fa-clock mr-1"></i>${t.mins} mnt<div class="text-stone-400 font-normal">${t.waiter}</div></div>
+                        <div class="font-bold whitespace-nowrap">${t.total ? rp(t.total) : ''}</div></div>` : `<div class="mt-auto text-stone-300 text-3xl text-center"><i class="fas ${t.status === 'dirty' ? 'fa-broom' : 'fa-plus'}"></i></div>`}
+                </button>`;
+            }).join('');
+            renderDetail();
+        }
+
+        function renderDetail() {
+            const t = M.tables.find(x => x.name === selected);
+            const s = STATUS[t.status];
+            const d = document.getElementById('detail');
+            if (t.status === 'empty' || t.status === 'dirty') {
+                d.innerHTML = `<div class="p-5 border-b border-stone-200"><div class="text-3xl font-extrabold">Meja ${t.name}</div><div class="text-sm text-stone-500">${t.area} · kapasitas ${t.cap}</div></div>
+                <div class="p-5 space-y-3">
+                    ${t.status === 'dirty' ? `<button onclick="toast('Meja ditandai bersih')" class="w-full py-3 rounded-xl bg-stone-800 text-white font-bold"><i class="fas fa-broom mr-1"></i>Tandai Sudah Bersih</button>` : ''}
+                    <div class="text-sm font-semibold">Jumlah tamu</div>
+                    <div class="grid grid-cols-4 gap-2">${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<button class="py-3 rounded-xl border border-stone-200 font-semibold hover:border-brand-500">${n}</button>`).join('')}</div>
+                    <button onclick="location.href='pos.html'" class="w-full py-3 rounded-xl bg-brand-500 text-white font-bold"><i class="fas fa-utensils mr-1"></i>Buka Meja &amp; Pesan</button>
+                </div>`;
+                return;
+            }
+            const items = [
+                ['Nasi Goreng Kampung', 'Pedas, Telur', 2, 80000], ['Ayam Bakar Madu', 'Sedang', 1, 42000],
+                ['Kopi Susu Gula Aren', 'Large, Ice', 2, 62000], ['Es Teh Leci', 'Regular', 2, 40000], ['Kentang Goreng', '', 1, 22000]
+            ];
+            d.innerHTML = `
+                <div class="p-5 border-b border-stone-200">
+                    <div class="flex items-start justify-between"><div class="text-3xl font-extrabold">Meja ${t.name}</div>
+                    <span class="text-xs font-bold px-2 py-1 rounded-full ${s.card.replace('pulse-red', '')} ${s.text} border">${s.label}</span></div>
+                    <div class="text-sm text-stone-500 mt-1">${t.area} · ${t.guests} tamu · ${t.mins} mnt · Waiter ${t.waiter}</div>
+                    <div class="text-xs text-stone-400">Order #SDM-0198 · dibuka 13:51</div>
+                </div>
+                <div class="flex-1 overflow-y-auto thin-scroll p-4 space-y-2 text-sm">
+                    ${t.status === 'seated' ? '<div class="text-center text-stone-400 py-10">Belum ada pesanan</div>' : items.map(i => `<div class="flex justify-between"><div><b>${i[2]}×</b> ${i[0]}<div class="text-xs text-stone-500 pl-5">${i[1]}</div></div><span>${rp(i[3])}</span></div>`).join('')}
+                </div>
+                <div class="p-4 border-t border-stone-200">
+                    <div class="flex justify-between text-lg font-extrabold mb-3"><span>Total</span><span>${rp(t.total)}</span></div>
+                    <div class="grid grid-cols-3 gap-2 text-xs font-semibold">
+                        ${[['fa-plus', 'Tambah Pesanan', "location.href='pos.html'"], ['fa-right-left', 'Pindah Meja', "toast('Pilih meja tujuan…')"], ['fa-object-group', 'Gabung Meja', "toast('Pilih meja yang digabung…')"],
+                          ['fa-scissors', 'Split Bill', "toast('Split per item / rata / nominal')"], ['fa-print', 'Cetak Bill', "toast('Pre-bill dicetak')"], ['fa-ban', 'Void', "toast('Butuh PIN supervisor')"]]
+                          .map(b => `<button onclick="${b[2]}" class="py-3 rounded-xl bg-stone-100 hover:bg-stone-200"><i class="fas ${b[0]} block text-base mb-1"></i>${b[1]}</button>`).join('')}
+                    </div>
+                    <button onclick="location.href='pos.html'" class="mt-2 w-full py-3 rounded-xl bg-brand-500 text-white font-bold"><i class="fas fa-wallet mr-1"></i>Bayar ${rp(t.total)}</button>
+                </div>`;
+        }
+
+        let toastT;
+        function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.add('hidden'), 2400); }
+        render();
+    </script>
+</body>
+</html>

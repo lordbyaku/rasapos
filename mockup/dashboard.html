@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Pusat — RasaPOS (Mockup)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="assets/style.css">
+    <script>tailwind.config = { theme: { extend: { colors: { brand: { 50: '#fff7ed', 100: '#ffedd5', 500: '#f97316', 600: '#ea580c', 700: '#c2410c' } } } } };</script>
+</head>
+<body class="bg-stone-100 text-stone-800 h-screen overflow-hidden flex">
+
+    <!-- SIDEBAR BACKOFFICE -->
+    <aside class="w-60 bg-stone-900 text-stone-300 flex flex-col shrink-0">
+        <div class="h-16 flex items-center gap-3 px-4 border-b border-stone-800">
+            <a href="index.html" class="w-9 h-9 rounded-xl bg-brand-500 text-white grid place-items-center font-extrabold">R</a>
+            <div class="leading-tight"><div class="font-bold text-white text-sm">Kopi &amp; Makan Nusantara</div><div class="text-[11px] text-stone-500">Back Office · Owner</div></div>
+        </div>
+        <nav class="p-3 space-y-0.5 text-sm flex-1 overflow-y-auto no-scrollbar">
+            <div class="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-stone-500">Utama</div>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-brand-500 text-white font-semibold" href="dashboard.html"><i class="fas fa-chart-line w-4"></i>Dashboard</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#tx"><i class="fas fa-receipt w-4"></i>Transaksi</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#"><i class="fas fa-file-lines w-4"></i>Laporan</a>
+            <div class="px-3 pt-4 pb-1 text-[10px] uppercase tracking-wider text-stone-500">Katalog</div>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="menu.html"><i class="fas fa-utensils w-4"></i>Menu &amp; Modifier</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#"><i class="fas fa-tags w-4"></i>Promo</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#"><i class="fas fa-boxes-stacked w-4"></i>Bahan &amp; Resep</a>
+            <div class="px-3 pt-4 pb-1 text-[10px] uppercase tracking-wider text-stone-500">Organisasi</div>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#"><i class="fas fa-store w-4"></i>Outlet</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#"><i class="fas fa-users w-4"></i>Staff &amp; Akses</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#"><i class="fas fa-tablet-screen-button w-4"></i>Perangkat</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-800" href="#"><i class="fas fa-gear w-4"></i>Pengaturan</a>
+        </nav>
+        <div class="p-3 border-t border-stone-800 text-xs">
+            <div class="bg-stone-800 rounded-lg p-3"><div class="text-stone-400">Paket</div><div class="text-white font-semibold">Pro — 4/5 outlet</div><div class="text-stone-500">Aktif s/d 31 Des 2026</div></div>
+        </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0">
+        <!-- TOPBAR -->
+        <header class="h-16 bg-white border-b border-stone-200 flex items-center px-5 gap-3 shrink-0">
+            <h1 class="text-lg font-bold">Dashboard</h1>
+            <div class="relative ml-4">
+                <button onclick="document.getElementById('outlet-dd').classList.toggle('hidden')" class="flex items-center gap-2 px-3 py-2 rounded-xl border border-stone-200 bg-white text-sm font-semibold min-w-[220px]">
+                    <i class="fas fa-store text-brand-500"></i><span id="outlet-label">Semua Outlet (4)</span><i class="fas fa-chevron-down ml-auto text-xs text-stone-400"></i>
+                </button>
+                <div id="outlet-dd" class="hidden absolute top-12 left-0 w-72 bg-white rounded-xl shadow-xl border border-stone-200 p-2 z-30"></div>
+            </div>
+            <div class="flex bg-stone-100 rounded-xl p-1 text-sm font-medium">
+                <button class="px-3 py-1.5 rounded-lg bg-white shadow-sm">Hari ini</button>
+                <button class="px-3 py-1.5 rounded-lg text-stone-500">Kemarin</button>
+                <button class="px-3 py-1.5 rounded-lg text-stone-500">7 hari</button>
+                <button class="px-3 py-1.5 rounded-lg text-stone-500">Bulan ini</button>
+                <button class="px-3 py-1.5 rounded-lg text-stone-500"><i class="fas fa-calendar"></i></button>
+            </div>
+            <div class="ml-auto flex items-center gap-3 text-sm">
+                <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold"><i class="fas fa-circle text-[7px] mr-1 align-middle blink"></i>Live</span>
+                <button class="px-3 py-2 rounded-xl border border-stone-200"><i class="fas fa-file-export mr-1"></i>Export</button>
+                <div class="w-9 h-9 rounded-full bg-brand-100 text-brand-700 grid place-items-center font-bold">TR</div>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto thin-scroll p-5 space-y-5">
+            <!-- KPI -->
+            <section id="kpi" class="grid grid-cols-2 xl:grid-cols-5 gap-4"></section>
+
+            <!-- CHARTS -->
+            <section class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                <div class="bg-white rounded-2xl p-4 border border-stone-200 xl:col-span-2">
+                    <div class="flex items-center justify-between"><h3 class="font-bold">Penjualan per Jam</h3><span class="text-xs text-stone-500">ditumpuk per outlet</span></div>
+                    <div class="h-64 mt-2"><canvas id="ch-hour"></canvas></div>
+                </div>
+                <div class="bg-white rounded-2xl p-4 border border-stone-200">
+                    <h3 class="font-bold">Tipe Order &amp; Channel</h3>
+                    <div class="h-64 mt-2"><canvas id="ch-channel"></canvas></div>
+                </div>
+            </section>
+
+            <!-- OUTLET COMPARISON -->
+            <section class="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+                <div class="p-4 flex items-center justify-between"><h3 class="font-bold">Performa &amp; Status Outlet</h3><span class="text-xs text-stone-500">klik baris untuk fokus ke outlet</span></div>
+                <div class="overflow-x-auto thin-scroll"><table class="w-full text-sm whitespace-nowrap">
+                    <thead class="bg-stone-50 text-stone-500 text-xs uppercase"><tr>
+                        <th class="text-left px-4 py-2">Outlet</th><th class="text-left px-4 py-2">Status</th><th class="text-right px-4 py-2">Penjualan</th>
+                        <th class="px-4 py-2 w-48">Kontribusi</th><th class="text-right px-4 py-2">Transaksi</th><th class="text-right px-4 py-2">Rata-rata</th>
+                        <th class="text-right px-4 py-2">Tamu</th><th class="text-right px-4 py-2">Order Terbuka</th><th class="text-left px-4 py-2">Kasir Aktif</th><th class="text-left px-4 py-2">Trx Terakhir</th></tr></thead>
+                    <tbody id="outlet-rows"></tbody>
+                </table></div>
+            </section>
+
+            <section class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                <!-- LIVE TRANSACTIONS -->
+                <div id="tx" class="bg-white rounded-2xl border border-stone-200 xl:col-span-2 overflow-hidden">
+                    <div class="p-4 flex items-center justify-between">
+                        <h3 class="font-bold">Transaksi Terbaru <span class="text-xs font-normal text-stone-500">— semua outlet, real-time</span></h3>
+                        <div class="flex gap-2 text-xs">
+                            <select class="border border-stone-200 rounded-lg px-2 py-1.5"><option>Semua tipe</option><option>Dine-in</option><option>Take Away</option><option>GoFood</option><option>GrabFood</option></select>
+                            <select class="border border-stone-200 rounded-lg px-2 py-1.5"><option>Semua status</option><option>Lunas</option><option>Void</option><option>Refund</option></select>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto thin-scroll"><table class="w-full text-sm whitespace-nowrap">
+                        <thead class="bg-stone-50 text-stone-500 text-xs uppercase"><tr>
+                            <th class="text-left px-4 py-2">Waktu</th><th class="text-left px-4 py-2">No. Order</th><th class="text-left px-4 py-2">Outlet</th><th class="text-left px-4 py-2">Tipe</th>
+                            <th class="text-left px-4 py-2">Kasir</th><th class="text-left px-4 py-2">Bayar</th><th class="text-right px-4 py-2">Total</th><th class="px-4 py-2"></th></tr></thead>
+                        <tbody id="tx-rows"></tbody>
+                    </table></div>
+                </div>
+                <div class="space-y-4">
+                    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+                        <h3 class="font-bold mb-3">Menu Terlaris</h3>
+                        <div id="top-menu" class="space-y-2.5 text-sm"></div>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+                        <h3 class="font-bold mb-3">Perlu Perhatian</h3>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex gap-2 p-2.5 rounded-xl bg-red-50 text-red-700"><i class="fas fa-plug-circle-xmark mt-0.5"></i><div><b>Gubeng</b> offline 2 jam, shift belum dibuka</div></div>
+                            <div class="flex gap-2 p-2.5 rounded-xl bg-amber-50 text-amber-800"><i class="fas fa-ban mt-0.5"></i><div><b>Kemang</b>: 5 void hari ini (Rp 312.000) — kasir Dimas</div></div>
+                            <div class="flex gap-2 p-2.5 rounded-xl bg-amber-50 text-amber-800"><i class="fas fa-scale-unbalanced mt-0.5"></i><div><b>Dago</b>: selisih kas shift kemarin −Rp 45.000</div></div>
+                            <div class="flex gap-2 p-2.5 rounded-xl bg-stone-100"><i class="fas fa-box-open mt-0.5"></i><div>Stok susu oat menipis di 2 outlet</div></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- DRAWER DETAIL TRANSAKSI -->
+    <div id="drawer" class="hidden fixed inset-0 modal-bg z-40" onclick="if(event.target===this)this.classList.add('hidden')">
+        <div class="absolute right-0 top-0 h-full w-[420px] bg-white flex flex-col">
+            <div class="p-4 border-b border-stone-200 flex items-center"><h3 class="font-bold flex-1">Detail Transaksi</h3><button onclick="document.getElementById('drawer').classList.add('hidden')" class="w-9 h-9 rounded-lg hover:bg-stone-100"><i class="fas fa-xmark"></i></button></div>
+            <div id="drawer-body" class="flex-1 overflow-y-auto p-4 text-sm"></div>
+            <div class="p-4 border-t border-stone-200 grid grid-cols-3 gap-2 text-sm font-semibold">
+                <button class="py-2.5 rounded-xl bg-stone-100"><i class="fas fa-print mr-1"></i>Struk</button>
+                <button class="py-2.5 rounded-xl bg-stone-100"><i class="fas fa-clock-rotate-left mr-1"></i>Log</button>
+                <button class="py-2.5 rounded-xl bg-red-50 text-red-600"><i class="fas fa-rotate-left mr-1"></i>Refund</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/data.js"></script>
+    <script>
+        const M = window.MOCK;
+        const COLORS = ['#f97316', '#0ea5e9', '#22c55e', '#a855f7'];
+        let selOutlets = M.outlets.map(o => o.id);
+        let txs = [];
+        const types = ['Dine-in', 'Dine-in', 'Dine-in', 'Take Away', 'GoFood', 'GrabFood'];
+
+        // generate transaksi dummy
+        (function seed() {
+            let d = new Date(); d.setSeconds(0);
+            for (let i = 0; i < 14; i++) {
+                d = new Date(d.getTime() - (2 + Math.random() * 5) * 60000);
+                txs.push(fakeTx(d));
+            }
+        })();
+        function fakeTx(d) {
+            const o = M.outlets[Math.floor(Math.random() * 3)];
+            const type = types[Math.floor(Math.random() * types.length)];
+            return {
+                time: d, outlet: o, type, no: o.code.split('-')[1] + '-0' + (100 + Math.floor(Math.random() * 120)),
+                cashier: o.cashier, method: type.includes('Food') ? type : M.payMethods[Math.floor(Math.random() * 3)],
+                total: Math.round((40000 + Math.random() * 420000) / 100) * 100, status: Math.random() < .08 ? 'Void' : 'Lunas', fresh: false
+            };
+        }
+
+        function filtered() { return M.outlets.filter(o => selOutlets.includes(o.id)); }
+
+        function renderOutletDD() {
+            document.getElementById('outlet-dd').innerHTML = `
+                <label class="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-stone-50 font-semibold"><input type="checkbox" ${selOutlets.length === M.outlets.length ? 'checked' : ''} onchange="selOutlets=this.checked?M.outlets.map(o=>o.id):[];renderAll()" class="accent-orange-500"> Semua Outlet</label>
+                <div class="border-t border-stone-100 my-1"></div>
+                ${M.outlets.map(o => `<label class="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-stone-50"><input type="checkbox" ${selOutlets.includes(o.id) ? 'checked' : ''} onchange="toggleOutlet(${o.id})" class="accent-orange-500">
+                    <span class="flex-1">${o.name} <span class="text-xs text-stone-400">${o.city}</span></span><i class="fas fa-circle text-[7px] ${o.online ? 'text-emerald-500' : 'text-stone-300'}"></i></label>`).join('')}
+                <div class="border-t border-stone-100 my-1"></div>
+                <div class="px-2 py-1 text-[11px] text-stone-400">Grup: <button class="text-brand-600" onclick="selOutlets=[1,2];renderAll()">Jakarta</button> · <button class="text-brand-600" onclick="selOutlets=[3,4];renderAll()">Luar Jakarta</button></div>`;
+            const f = filtered();
+            document.getElementById('outlet-label').textContent = f.length === M.outlets.length ? `Semua Outlet (${f.length})` : f.length === 1 ? 'Outlet ' + f[0].name : `${f.length} outlet dipilih`;
+        }
+        function toggleOutlet(id) { selOutlets = selOutlets.includes(id) ? selOutlets.filter(x => x !== id) : [...selOutlets, id]; renderAll(); }
+        function focusOutlet(id) { selOutlets = [id]; renderAll(); window.scrollTo(0, 0); }
+
+        function renderKPI() {
+            const f = filtered();
+            const sales = f.reduce((s, o) => s + o.sales, 0), trx = f.reduce((s, o) => s + o.trx, 0), guests = f.reduce((s, o) => s + o.guests, 0);
+            const open = f.reduce((s, o) => s + o.openOrders, 0);
+            const card = (label, val, delta, icon, up = true) => `<div class="bg-white rounded-2xl p-4 border border-stone-200">
+                <div class="flex items-center justify-between text-stone-500 text-sm">${label}<i class="fas ${icon} text-brand-500"></i></div>
+                <div class="text-2xl font-extrabold mt-1 whitespace-nowrap">${val}</div>
+                <div class="text-xs mt-1 ${up ? 'text-emerald-600' : 'text-red-500'}"><i class="fas fa-arrow-${up ? 'up' : 'down'} mr-1"></i>${delta} vs kemarin</div></div>`;
+            document.getElementById('kpi').innerHTML =
+                card('Penjualan Bersih', rp(sales), '12,4%', 'fa-sack-dollar') +
+                card('Transaksi', trx.toLocaleString('id-ID'), '8,1%', 'fa-receipt') +
+                card('Rata-rata / Transaksi', rp(trx ? sales / trx : 0), '3,9%', 'fa-scale-balanced') +
+                card('Jumlah Tamu', guests.toLocaleString('id-ID'), '2,2%', 'fa-users', false) +
+                card('Order Terbuka', open, 'live', 'fa-hourglass-half');
+        }
+
+        let chHour, chChan;
+        function renderCharts() {
+            const hours = Array.from({ length: 14 }, (_, i) => (8 + i) + ':00');
+            const curve = [2, 4, 5, 6, 9, 12, 10, 6, 5, 6, 8, 11, 9, 5];
+            const f = filtered();
+            const ds = f.map(o => ({ label: o.name, data: curve.map((c, i) => Math.round(o.sales / 100 * c * (0.8 + ((o.id * 7 + i) % 5) / 10))), backgroundColor: COLORS[o.id - 1], borderRadius: 4 }));
+            if (chHour) chHour.destroy();
+            chHour = new Chart(document.getElementById('ch-hour'), {
+                type: 'bar', data: { labels: hours, datasets: ds },
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + rp(c.raw) } } },
+                    scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, ticks: { callback: v => (v / 1e6) + ' jt' } } } }
+            });
+            const tot = f.reduce((s, o) => s + o.sales, 0);
+            if (chChan) chChan.destroy();
+            chChan = new Chart(document.getElementById('ch-channel'), {
+                type: 'doughnut',
+                data: { labels: ['Dine-in', 'Take Away', 'GoFood', 'GrabFood', 'ShopeeFood'], datasets: [{ data: [.52, .17, .15, .12, .04].map(p => Math.round(tot * p)), backgroundColor: ['#f97316', '#fdba74', '#16a34a', '#22c55e', '#f43f5e'], borderWidth: 0 }] },
+                options: { maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, tooltip: { callbacks: { label: c => c.label + ': ' + rp(c.raw) } } } }
+            });
+        }
+
+        function renderOutlets() {
+            const total = M.outlets.reduce((s, o) => s + o.sales, 0);
+            document.getElementById('outlet-rows').innerHTML = M.outlets.map(o => {
+                const on = selOutlets.includes(o.id), pct = o.sales / total * 100;
+                return `<tr onclick="focusOutlet(${o.id})" class="border-t border-stone-100 cursor-pointer hover:bg-brand-50/50 ${on ? '' : 'opacity-40'}">
+                    <td class="px-4 py-3"><div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full" style="background:${COLORS[o.id - 1]}"></span><div><b>${o.name}</b><div class="text-xs text-stone-400">${o.code} · ${o.city}</div></div></div></td>
+                    <td class="px-4 py-3">${o.online ? '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">Online</span>' : '<span class="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 font-semibold">Offline</span>'}
+                        <div class="text-[11px] text-stone-400 mt-0.5">${o.shiftOpen ? 'Shift buka' : 'Shift tutup'}</div></td>
+                    <td class="px-4 py-3 text-right font-semibold">${rp(o.sales)}</td>
+                    <td class="px-4 py-3"><div class="h-2 bg-stone-100 rounded-full"><div class="h-2 rounded-full" style="width:${pct}%;background:${COLORS[o.id - 1]}"></div></div><div class="text-[11px] text-stone-400 mt-0.5">${pct.toFixed(1)}%</div></td>
+                    <td class="px-4 py-3 text-right">${o.trx}</td><td class="px-4 py-3 text-right">${rp(o.sales / o.trx)}</td>
+                    <td class="px-4 py-3 text-right">${o.guests}</td><td class="px-4 py-3 text-right">${o.openOrders}</td>
+                    <td class="px-4 py-3">${o.cashier}</td><td class="px-4 py-3 text-stone-500">${o.lastTx}</td></tr>`;
+            }).join('');
+        }
+
+        function renderTx() {
+            const list = txs.filter(t => selOutlets.includes(t.outlet.id)).slice(0, 12);
+            document.getElementById('tx-rows').innerHTML = list.map((t, i) => `
+                <tr onclick="openTx(${txs.indexOf(t)})" class="border-t border-stone-100 cursor-pointer hover:bg-stone-50 ${t.fresh ? 'bg-emerald-50' : ''}">
+                    <td class="px-4 py-2.5 text-stone-500">${t.time.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</td>
+                    <td class="px-4 py-2.5 font-mono text-xs">#${t.no}</td>
+                    <td class="px-4 py-2.5"><span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full" style="background:${COLORS[t.outlet.id - 1]}"></span>${t.outlet.name}</span></td>
+                    <td class="px-4 py-2.5">${t.type}</td><td class="px-4 py-2.5">${t.cashier}</td><td class="px-4 py-2.5">${t.method}</td>
+                    <td class="px-4 py-2.5 text-right font-semibold ${t.status === 'Void' ? 'line-through text-stone-400' : ''}">${rp(t.total)}</td>
+                    <td class="px-4 py-2.5">${t.status === 'Void' ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 font-bold">VOID</span>' : t.fresh ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500 text-white font-bold">BARU</span>' : ''}</td></tr>`).join('')
+                || '<tr><td colspan="8" class="text-center text-stone-400 py-8">Pilih minimal satu outlet</td></tr>';
+        }
+
+        function renderTop() {
+            const top = [['Kopi Susu Gula Aren', 412], ['Nasi Ayam Geprek', 236], ['Es Teh Leci', 198], ['Nasi Goreng Kampung', 171], ['Matcha Latte', 144]];
+            const k = filtered().length / M.outlets.length;
+            document.getElementById('top-menu').innerHTML = top.map((m, i) => `<div class="flex items-center gap-3"><span class="w-6 h-6 rounded-lg bg-brand-50 text-brand-600 grid place-items-center text-xs font-bold">${i + 1}</span><span class="flex-1">${m[0]}</span><b>${Math.round(m[1] * k)}</b></div>`).join('');
+        }
+
+        function openTx(i) {
+            const t = txs[i];
+            document.getElementById('drawer-body').innerHTML = `
+                <div class="flex items-center justify-between"><span class="font-mono font-bold">#${t.no}</span><span class="text-xs px-2 py-0.5 rounded-full ${t.status === 'Void' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'} font-bold">${t.status}</span></div>
+                <div class="grid grid-cols-2 gap-y-2 mt-4 text-stone-500">
+                    <span>Outlet</span><b class="text-stone-800">${t.outlet.name}</b><span>Waktu</span><b class="text-stone-800">${t.time.toLocaleString('id-ID')}</b>
+                    <span>Tipe</span><b class="text-stone-800">${t.type}${t.type === 'Dine-in' ? ' · Meja A3' : ''}</b><span>Kasir</span><b class="text-stone-800">${t.cashier}</b>
+                    <span>Perangkat</span><b class="text-stone-800">Kasir-01</b><span>Pembayaran</span><b class="text-stone-800">${t.method}</b></div>
+                <div class="border-t border-dashed border-stone-300 my-4"></div>
+                <div class="space-y-2">
+                    <div class="flex justify-between"><span>2× Kopi Susu Gula Aren<div class="text-xs text-stone-400">Large, Ice</div></span><span>${rp(62000)}</span></div>
+                    <div class="flex justify-between"><span>1× Nasi Goreng Kampung<div class="text-xs text-stone-400">Pedas, Telur</div></span><span>${rp(40000)}</span></div>
+                    <div class="flex justify-between text-stone-400 line-through"><span>1× Kentang Goreng<div class="text-xs">void: salah input (spv Ayu)</div></span><span>${rp(22000)}</span></div>
+                </div>
+                <div class="border-t border-dashed border-stone-300 my-4"></div>
+                <div class="flex justify-between text-lg font-extrabold"><span>Total</span><span>${rp(t.total)}</span></div>`;
+            document.getElementById('drawer').classList.remove('hidden');
+        }
+
+        function renderAll() { renderOutletDD(); renderKPI(); renderCharts(); renderOutlets(); renderTx(); renderTop(); }
+        renderAll();
+
+        // Simulasi realtime: transaksi baru masuk dari outlet mana pun
+        setInterval(() => {
+            txs.forEach(t => t.fresh = false);
+            const t = fakeTx(new Date()); t.fresh = true; t.status = 'Lunas';
+            txs.unshift(t);
+            t.outlet.sales += t.total; t.outlet.trx += 1; t.outlet.lastTx = 'baru saja';
+            renderKPI(); renderOutlets(); renderTx();
+        }, 6000);
+
+        document.addEventListener('click', e => { if (!document.body.contains(e.target)) return; if (!e.target.closest('#outlet-dd') && !e.target.closest('[onclick*="outlet-dd"]')) document.getElementById('outlet-dd').classList.add('hidden'); });
+    </script>
+</body>
+</html>

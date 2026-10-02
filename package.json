@@ -1,0 +1,27 @@
+{
+  "name": "rasapos-cloud",
+  "version": "1.0.0",
+  "private": true,
+  "description": "POS Food & Beverage multi-outlet di Cloudflare (Workers + Durable Objects + D1)",
+  "type": "module",
+  "scripts": {
+    "setup": "node scripts/vendor.mjs && node scripts/icons.mjs && npm run css",
+    "css": "tailwindcss -c tailwind.config.cjs -i styles/app.src.css -o public/css/app.css --minify",
+    "css:watch": "tailwindcss -c tailwind.config.cjs -i styles/app.src.css -o public/css/app.css --watch",
+    "db:migrate:local": "wrangler d1 migrations apply CORE --local",
+    "db:migrate:remote": "wrangler d1 migrations apply CORE --remote",
+    "dev": "npm run css && npm run db:migrate:local && wrangler dev",
+    "test": "node --test \"test/**/*.test.js\"",
+    "smoke": "node scripts/smoke.mjs",
+    "seed": "node scripts/seed.mjs",
+    "build": "npm run setup && node scripts/bump-version.mjs",
+    "deploy": "npm run build && npm run db:migrate:remote && wrangler deploy"
+  },
+  "devDependencies": {
+    "@fortawesome/fontawesome-free": "^6.7.2",
+    "chart.js": "^4.5.0",
+    "sweetalert2": "^11.22.0",
+    "tailwindcss": "^3.4.19",
+    "wrangler": "^4.147.0"
+  }
+}

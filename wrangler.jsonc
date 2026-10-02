@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rasapos",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "CORE",
+      "database_name": "rasapos-core",
+      // Ganti dengan ID dari `npx wrangler d1 create rasapos-core` sebelum deploy.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "TENANT", "class_name": "TenantDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TenantDO"] }],
+  // R2 opsional untuk backup harian. Aktifkan setelah membuat bucket `rasapos-backup`.
+  // "r2_buckets": [{ "binding": "BACKUP", "bucket_name": "rasapos-backup" }],
+  "vars": {
+    "APP_NAME": "RasaPOS",
+    "APP_URL": "http://localhost:8787",
+    "SUPERADMIN_EMAILS": "admin@rasapos.local",
+    "TRIAL_DAYS": "14",
+    "GRACE_DAYS": "3",
+    "OUTLETS_PER_PACK": "5",
+    "PBKDF2_ITERATIONS": "60000",
+    "MAIL_FROM": ""
+  },
+  "observability": { "enabled": true }
+}

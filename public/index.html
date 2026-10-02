@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f97316">
+    <title>RasaPOS — POS F&amp;B Multi-Outlet</title>
+    <link rel="icon" href="/icons/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+</head>
+<body class="min-h-screen">
+    <div class="min-h-screen grid lg:grid-cols-2">
+        <!-- Panel kiri: branding -->
+        <section class="hidden lg:flex flex-col justify-between bg-stone-900 text-white p-10">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-brand-500 grid place-items-center text-xl font-extrabold">R</div>
+                <div><div class="font-bold text-lg">RasaPOS</div><div class="text-stone-400 text-sm">POS Food &amp; Beverage</div></div>
+            </div>
+            <div>
+                <h1 class="text-4xl font-extrabold leading-tight">Kasir resto & kafe untuk<br>semua outlet Anda.</h1>
+                <ul class="mt-6 space-y-3 text-stone-300">
+                    <li><i class="fas fa-store text-brand-500 w-6"></i>Pantau transaksi semua outlet dari satu dashboard</li>
+                    <li><i class="fas fa-chair text-brand-500 w-6"></i>Meja, open bill, split bill, kirim ke dapur</li>
+                    <li><i class="fas fa-fire-burner text-brand-500 w-6"></i>Kitchen display & printer Bluetooth</li>
+                    <li><i class="fas fa-wifi text-brand-500 w-6"></i>Tetap jualan saat internet putus</li>
+                </ul>
+            </div>
+            <div class="text-stone-500 text-xs">© RasaPOS</div>
+        </section>
+
+        <!-- Panel kanan: form -->
+        <main class="flex items-center justify-center p-5">
+            <div class="w-full max-w-md">
+                <div class="lg:hidden flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 rounded-2xl bg-brand-500 text-white grid place-items-center text-lg font-extrabold">R</div>
+                    <div class="font-bold text-lg">RasaPOS</div>
+                </div>
+
+                <div class="flex bg-stone-200/70 rounded-xl p-1 mb-5 text-sm font-semibold" id="tabs">
+                    <button data-view="login" class="tab flex-1">Masuk</button>
+                    <button data-view="register" class="tab flex-1">Daftar</button>
+                    <button data-view="pair" class="tab flex-1"><i class="fas fa-tablet-screen-button mr-1"></i>Perangkat Outlet</button>
+                </div>
+
+                <!-- Login -->
+                <form id="view-login" class="card p-6 space-y-4">
+                    <div><h2 class="text-xl font-bold">Masuk ke Back Office</h2><p class="text-sm text-stone-500">Untuk pemilik & manajer</p></div>
+                    <div><label class="label">Email</label><input name="email" type="email" required autocomplete="username" class="input"></div>
+                    <div><label class="label">Password</label><input name="password" type="password" required autocomplete="current-password" class="input"></div>
+                    <button class="btn-primary w-full py-3">Masuk</button>
+                    <button type="button" data-view="forgot" class="text-sm text-brand-600 w-full">Lupa password?</button>
+                </form>
+
+                <!-- Daftar -->
+                <form id="view-register" class="card p-6 space-y-3 hidden">
+                    <div><h2 class="text-xl font-bold">Daftar usaha baru</h2><p class="text-sm text-stone-500">Gratis trial 14 hari, tanpa kartu kredit</p></div>
+                    <div><label class="label">Nama usaha / brand</label><input name="business_name" required maxlength="80" class="input" placeholder="mis. Kopi Nusantara"></div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="label">Nama Anda</label><input name="owner_name" required maxlength="80" class="input"></div>
+                        <div><label class="label">No. HP</label><input name="phone" maxlength="30" class="input" inputmode="tel"></div>
+                    </div>
+                    <div><label class="label">Nama outlet pertama</label><input name="outlet_name" maxlength="80" class="input" value="Outlet Utama"></div>
+                    <div><label class="label">Email</label><input name="email" type="email" required class="input" autocomplete="username"></div>
+                    <div><label class="label">Password (min. 8 karakter)</label><input name="password" type="password" minlength="8" required class="input" autocomplete="new-password"></div>
+                    <button class="btn-primary w-full py-3">Daftar & mulai trial</button>
+                </form>
+
+                <!-- Lupa password -->
+                <form id="view-forgot" class="card p-6 space-y-4 hidden">
+                    <div><h2 class="text-xl font-bold">Lupa password</h2><p class="text-sm text-stone-500">Kami kirim tautan reset ke email Anda.</p></div>
+                    <div><label class="label">Email</label><input name="email" type="email" required class="input"></div>
+                    <button class="btn-primary w-full py-3">Kirim tautan reset</button>
+                    <button type="button" data-view="login" class="text-sm text-stone-500 w-full">Kembali ke login</button>
+                </form>
+
+                <!-- Reset password -->
+                <form id="view-reset" class="card p-6 space-y-4 hidden">
+                    <div><h2 class="text-xl font-bold">Buat password baru</h2></div>
+                    <div><label class="label">Password baru (min. 8 karakter)</label><input name="password" type="password" minlength="8" required class="input" autocomplete="new-password"></div>
+                    <button class="btn-primary w-full py-3">Simpan password</button>
+                </form>
+
+                <!-- Pairing perangkat -->
+                <form id="view-pair" class="card p-6 space-y-4 hidden">
+                    <div>
+                        <h2 class="text-xl font-bold">Pasangkan perangkat outlet</h2>
+                        <p class="text-sm text-stone-500">Untuk tablet kasir atau layar dapur. Minta <b>kode pairing 6 digit</b> dari pemilik/manajer di Back Office → Perangkat.</p>
+                    </div>
+                    <input name="code" required inputmode="numeric" pattern="\d{6}" maxlength="6" autocomplete="one-time-code" class="input text-center text-3xl tracking-[0.5em] font-bold py-4" placeholder="••••••">
+                    <button class="btn-primary w-full py-3"><i class="fas fa-link"></i>Pasangkan</button>
+                    <p class="text-xs text-stone-500"><i class="fas fa-circle-info mr-1"></i>Gunakan Google Chrome versi terbaru di Android agar printer Bluetooth & mode offline berfungsi.</p>
+                </form>
+                <a href="/tutorial.html" class="block text-center text-sm text-stone-500 hover:text-brand-600 mt-5"><i class="fas fa-graduation-cap mr-1"></i>Panduan & training pengguna</a>
+            </div>
+        </main>
+    </div>
+
+    <script src="/vendor/sweetalert2.all.min.js"></script>
+    <script src="/js/core/utils.js"></script>
+    <script src="/js/core/api.js"></script>
+    <script src="/js/core/pwa.js"></script>
+    <script src="/js/index.js"></script>
+</body>
+</html>

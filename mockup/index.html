@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RasaPOS — Mockup UI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="bg-stone-100 text-stone-800 min-h-screen">
+    <div class="max-w-5xl mx-auto px-4 py-10">
+        <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-orange-500 text-white grid place-items-center font-extrabold text-xl">R</div>
+            <div><h1 class="text-2xl font-extrabold">RasaPOS Cloud — Mockup UI</h1><p class="text-stone-500 text-sm">POS Food &amp; Beverage multi-outlet · data dummy, tanpa backend · lihat <code>PLAN.md</code></p></div>
+        </div>
+
+        <h2 class="mt-8 mb-3 text-xs uppercase tracking-wider text-stone-500 font-semibold">Aplikasi Outlet (tablet kasir / dapur)</h2>
+        <div class="grid sm:grid-cols-3 gap-4">
+            <a href="pos.html" class="bg-white rounded-2xl p-5 border border-stone-200 hover:border-orange-500 hover:shadow-lg transition">
+                <i class="fas fa-cash-register text-2xl text-orange-500"></i><div class="font-bold mt-3">Kasir</div>
+                <p class="text-sm text-stone-500 mt-1">Tipe order, grid menu, modifier, keranjang, service + PB1, kirim dapur, pembayaran split, struk.</p></a>
+            <a href="tables.html" class="bg-white rounded-2xl p-5 border border-stone-200 hover:border-orange-500 hover:shadow-lg transition">
+                <i class="fas fa-chair text-2xl text-orange-500"></i><div class="font-bold mt-3">Denah Meja</div>
+                <p class="text-sm text-stone-500 mt-1">Area, status meja berwarna, timer, open bill, pindah/gabung/split.</p></a>
+            <a href="kds.html" class="bg-white rounded-2xl p-5 border border-stone-200 hover:border-orange-500 hover:shadow-lg transition">
+                <i class="fas fa-fire-burner text-2xl text-orange-500"></i><div class="font-bold mt-3">Kitchen Display</div>
+                <p class="text-sm text-stone-500 mt-1">Tiket per stasiun (Dapur/Bar/Pastry), timer warna, status masak.</p></a>
+        </div>
+
+        <h2 class="mt-8 mb-3 text-xs uppercase tracking-wider text-stone-500 font-semibold">Back Office (owner / manajer)</h2>
+        <div class="grid sm:grid-cols-2 gap-4">
+            <a href="dashboard.html" class="bg-white rounded-2xl p-5 border border-stone-200 hover:border-orange-500 hover:shadow-lg transition">
+                <i class="fas fa-chart-line text-2xl text-orange-500"></i><div class="font-bold mt-3">Dashboard Pusat (Master Outlet)</div>
+                <p class="text-sm text-stone-500 mt-1">Pilih "Semua Outlet" atau per outlet, KPI, perbandingan outlet, status live, feed transaksi semua outlet (simulasi realtime tiap 6 detik).</p></a>
+            <a href="menu.html" class="bg-white rounded-2xl p-5 border border-stone-200 hover:border-orange-500 hover:shadow-lg transition">
+                <i class="fas fa-utensils text-2xl text-orange-500"></i><div class="font-bold mt-3">Menu &amp; Modifier</div>
+                <p class="text-sm text-stone-500 mt-1">Master menu terpusat, modifier, harga &amp; ketersediaan per outlet, harga per channel, resep/HPP.</p></a>
+        </div>
+
+        <h2 class="mt-8 mb-3 text-xs uppercase tracking-wider text-stone-500 font-semibold">Perencanaan</h2>
+        <a href="simulasi-limit.html" class="block bg-white rounded-2xl p-5 border border-stone-200 hover:border-orange-500 hover:shadow-lg transition">
+            <i class="fas fa-gauge-high text-2xl text-orange-500"></i><div class="font-bold mt-3">Simulasi Limit Supabase Free + Vercel Hobby</div>
+            <p class="text-sm text-stone-500 mt-1">Atur jumlah outlet, transaksi/hari, inventori &amp; optimasi, lalu lihat kapan tiap kuota tercapai.</p></a>
+
+        <p class="mt-8 text-xs text-stone-400">Mockup dioptimalkan untuk layar tablet landscape / desktop (≥ 1024 px).</p>
+    </div>
+</body>
+</html>

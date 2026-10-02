@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#f97316">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Kasir — RasaPOS</title>
+    <link rel="icon" href="/icons/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+    <style>
+        .menu-tile:active { transform: scale(.97); }
+        .numpad button { min-height: 52px; }
+    </style>
+</head>
+<body class="h-screen overflow-hidden select-none">
+
+    <!-- Memuat -->
+    <div id="screen-boot" class="fixed inset-0 z-[60] bg-stone-100 grid place-items-center">
+        <div class="text-center"><div class="w-14 h-14 mx-auto rounded-2xl bg-brand-500 text-white grid place-items-center text-2xl font-extrabold">R</div>
+            <div class="mt-4 text-stone-500"><i class="fas fa-spinner fa-spin mr-2"></i><span id="boot-msg">Memuat data outlet…</span></div></div>
+    </div>
+
+    <!-- Kunci: pilih staff + PIN -->
+    <div id="screen-lock" class="hidden fixed inset-0 z-50 bg-stone-900 text-white flex-col">
+        <div class="flex items-center gap-3 p-4">
+            <div class="w-10 h-10 rounded-xl bg-brand-500 grid place-items-center font-extrabold">R</div>
+            <div class="leading-tight"><div id="lock-outlet" class="font-bold"></div><div id="lock-device" class="text-xs text-stone-400"></div></div>
+            <div class="ml-auto flex items-center gap-2"><span id="lock-net" class="badge"></span><button id="lock-settings" class="w-10 h-10 rounded-xl hover:bg-stone-800"><i class="fas fa-gear"></i></button></div>
+        </div>
+        <div class="flex-1 grid lg:grid-cols-2 gap-6 p-6 overflow-y-auto">
+            <div>
+                <h2 class="text-lg font-bold mb-3">Siapa yang bertugas?</h2>
+                <div id="lock-staff" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+            </div>
+            <div class="flex flex-col items-center justify-center">
+                <div id="lock-who" class="text-stone-400 mb-3">Pilih nama Anda</div>
+                <div id="lock-dots" class="flex gap-3 mb-6 h-5"></div>
+                <div class="numpad grid grid-cols-3 gap-3 w-72" id="lock-pad"></div>
+                <div id="lock-err" class="text-red-400 text-sm mt-4 h-5"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aplikasi utama -->
+    <div id="screen-main" class="hidden h-full flex-col">
+        <header class="h-14 bg-white border-b border-stone-200 flex items-center px-3 gap-2 shrink-0">
+            <div class="w-9 h-9 rounded-xl bg-brand-500 text-white grid place-items-center font-extrabold shrink-0">R</div>
+            <div class="leading-tight hidden md:block min-w-0"><div id="hdr-outlet" class="font-bold text-sm truncate"></div><div id="hdr-device" class="text-[11px] text-stone-500 truncate"></div></div>
+            <nav class="ml-2 flex bg-stone-100 rounded-xl p-1 text-sm font-medium" id="nav-views">
+                <button data-v="order" class="tab"><i class="fas fa-cash-register md:mr-1.5"></i><span class="hidden md:inline">Kasir</span></button>
+                <button data-v="tables" class="tab"><i class="fas fa-chair md:mr-1.5"></i><span class="hidden md:inline">Meja</span></button>
+                <button data-v="orders" class="tab"><i class="fas fa-receipt md:mr-1.5"></i><span class="hidden md:inline">Order</span> <span id="open-count" class="ml-1 bg-brand-500 text-white text-[10px] px-1.5 rounded-full">0</span></button>
+            </nav>
+            <div class="ml-auto flex items-center gap-2 text-xs">
+                <button id="hdr-net" class="badge cursor-pointer"></button>
+                <button id="hdr-printer" class="badge bg-stone-100 text-stone-500 hidden"><i class="fas fa-print mr-1"></i><span></span></button>
+                <button id="hdr-shift" class="badge bg-stone-100 text-stone-600 hidden lg:inline-flex"></button>
+                <div class="relative">
+                    <button id="hdr-user" class="flex items-center gap-2 pl-2 border-l border-stone-200">
+                        <div id="hdr-avatar" class="w-8 h-8 rounded-full bg-brand-100 text-brand-700 grid place-items-center font-bold"></div>
+                        <div class="leading-tight text-left hidden xl:block"><div id="hdr-name" class="font-semibold"></div><div id="hdr-role" class="text-stone-500"></div></div>
+                        <i class="fas fa-chevron-down text-stone-400"></i>
+                    </button>
+                    <div id="user-menu" class="hidden absolute right-0 top-11 z-40 w-60 card shadow-xl p-1.5 text-sm"></div>
+                </div>
+            </div>
+        </header>
+        <div id="banner" class="hidden"></div>
+        <div id="view-order" class="flex-1 flex min-h-0"></div>
+        <div id="view-tables" class="flex-1 min-h-0 hidden"></div>
+        <div id="view-orders" class="flex-1 min-h-0 hidden"></div>
+    </div>
+
+    <!-- Modal generik -->
+    <div id="pos-modal" class="hidden fixed inset-0 z-[55] modal-bg items-center justify-center p-3">
+        <div id="pos-modal-box" class="bg-white rounded-2xl w-full max-w-lg max-h-[94vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-stone-200 flex items-center gap-3"><div id="pos-modal-title" class="font-bold flex-1"></div><button data-close class="w-10 h-10 rounded-lg hover:bg-stone-100"><i class="fas fa-xmark"></i></button></div>
+            <div id="pos-modal-body" class="flex-1 overflow-y-auto thin-scroll p-4"></div>
+            <div id="pos-modal-foot" class="p-4 border-t border-stone-200 flex gap-2"></div>
+        </div>
+    </div>
+
+    <div id="print-area"></div>
+
+    <script src="/vendor/sweetalert2.all.min.js"></script>
+    <script src="/js/shared/money.js"></script>
+    <script src="/js/shared/order-ops.js"></script>
+    <script src="/js/shared/pricing.js"></script>
+    <script src="/js/core/utils.js"></script>
+    <script src="/js/core/api.js"></script>
+    <script src="/js/core/idb.js"></script>
+    <script src="/js/core/realtime.js"></script>
+    <script src="/js/core/pwa.js"></script>
+    <script src="/js/core/escpos.js"></script>
+    <script src="/js/core/receipt.js"></script>
+    <script src="/js/core/printer.js"></script>
+    <script src="/js/pos/sync.js"></script>
+    <script src="/js/pos/app.js"></script>
+    <script src="/js/pos/order.js"></script>
+    <script src="/js/pos/tables.js"></script>
+    <script src="/js/pos/payment.js"></script>
+    <script src="/js/pos/shift.js"></script>
+    <script>POS.start();</script>
+</body>
+</html>

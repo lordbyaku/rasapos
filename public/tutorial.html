@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f97316">
+    <title>Panduan & Training — RasaPOS</title>
+    <link rel="icon" href="/icons/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+    <style>
+        .lesson h3 { font-weight: 700; font-size: 1.05rem; margin: 1.25rem 0 .5rem; }
+        .lesson p { margin: .5rem 0; line-height: 1.65; }
+        .lesson ol, .lesson ul { margin: .5rem 0 .5rem 1.25rem; line-height: 1.7; }
+        .lesson ol { list-style: decimal; }
+        .lesson ul { list-style: disc; }
+        .lesson kbd { background: #f5f5f4; border: 1px solid #d6d3d1; border-bottom-width: 2px; border-radius: 6px; padding: 0 6px; font-size: .8em; font-family: inherit; }
+        .lesson b { color: #1c1917; }
+        @media print {
+            body > *:not(#certificate) { display: none !important; }
+            #certificate { display: block !important; position: static !important; background: #fff !important; }
+            #certificate .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Header -->
+    <header class="sticky top-0 z-30 h-16 bg-white border-b border-stone-200 flex items-center px-4 gap-3">
+        <button id="t-menu" class="lg:hidden w-10 h-10 rounded-lg hover:bg-stone-100"><i class="fas fa-bars"></i></button>
+        <div class="w-9 h-9 rounded-xl bg-brand-500 text-white grid place-items-center font-extrabold">R</div>
+        <div class="leading-tight"><div class="font-bold">Panduan & Training</div><div class="text-[11px] text-stone-500">RasaPOS — POS Food & Beverage</div></div>
+        <div class="hidden md:flex items-center gap-2 ml-6 flex-1 max-w-md">
+            <div class="relative flex-1"><i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"></i><input id="t-search" class="input pl-9 !py-2" placeholder="Cari topik, mis. void, printer, offline…"></div>
+        </div>
+        <div class="ml-auto flex items-center gap-3">
+            <div class="hidden sm:block text-right leading-tight"><div class="text-[11px] text-stone-500">Progres saya</div><div class="text-sm font-bold"><span id="t-progress-text">0%</span></div></div>
+            <div class="w-24 h-2 bg-stone-200 rounded-full hidden sm:block"><div id="t-progress-bar" class="h-2 bg-brand-500 rounded-full transition-all" style="width:0%"></div></div>
+            <a href="/" class="btn-light !py-2"><i class="fas fa-arrow-left"></i><span class="hidden md:inline">Ke aplikasi</span></a>
+        </div>
+    </header>
+
+    <div class="flex">
+        <!-- Sidebar -->
+        <aside id="t-side" class="fixed lg:sticky top-16 z-20 h-[calc(100vh-4rem)] w-72 shrink-0 bg-white border-r border-stone-200 overflow-y-auto thin-scroll -translate-x-full lg:translate-x-0 transition-transform">
+            <div class="p-3 border-b border-stone-100">
+                <label class="label">Saya bertugas sebagai</label>
+                <select id="t-role" class="input !py-2">
+                    <option value="all">Semua peran</option>
+                    <option value="owner">Pemilik / Owner</option>
+                    <option value="manager">Manager outlet</option>
+                    <option value="cashier">Kasir</option>
+                    <option value="waiter">Waiter / Pelayan</option>
+                    <option value="kitchen">Dapur / Bar</option>
+                </select>
+                <div class="md:hidden mt-2 relative"><i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"></i><input id="t-search-m" class="input pl-9 !py-2" placeholder="Cari topik…"></div>
+            </div>
+            <nav id="t-nav" class="p-2 text-sm"></nav>
+            <div class="p-3 border-t border-stone-100 space-y-2">
+                <button id="t-cert" class="btn-primary w-full"><i class="fas fa-award"></i>Sertifikat training</button>
+                <button id="t-reset" class="btn-light w-full text-xs"><i class="fas fa-rotate-left"></i>Reset progres</button>
+            </div>
+        </aside>
+        <div id="t-backdrop" class="fixed inset-0 z-10 bg-black/40 hidden lg:hidden"></div>
+
+        <!-- Konten -->
+        <main class="flex-1 min-w-0">
+            <div id="t-content" class="max-w-4xl mx-auto p-4 lg:p-8"></div>
+        </main>
+    </div>
+
+    <!-- Sertifikat -->
+    <div id="certificate" class="hidden fixed inset-0 z-50 modal-bg items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-2xl p-8 text-center border-8 border-double border-brand-200 relative">
+            <button class="no-print absolute right-3 top-3 w-9 h-9 rounded-lg hover:bg-stone-100" id="cert-close"><i class="fas fa-xmark"></i></button>
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-brand-500 text-white grid place-items-center text-2xl font-extrabold">R</div>
+            <div class="mt-4 text-xs uppercase tracking-[0.3em] text-stone-500">Sertifikat Training</div>
+            <h2 class="text-3xl font-extrabold mt-2">RasaPOS</h2>
+            <p class="mt-6 text-stone-500">Diberikan kepada</p>
+            <input id="cert-name" class="no-print input text-center text-xl font-bold mt-2 max-w-sm mx-auto" placeholder="Ketik nama Anda">
+            <div id="cert-name-print" class="hidden print:inline-block text-2xl font-extrabold mt-2 border-b-2 border-stone-300 inline-block min-w-[260px] pb-1"></div>
+            <p class="mt-4 text-stone-600">telah menyelesaikan training <b id="cert-role"></b></p>
+            <div id="cert-detail" class="mt-3 text-sm text-stone-500"></div>
+            <div class="mt-6 text-sm text-stone-500" id="cert-date"></div>
+            <div class="no-print mt-6 flex gap-2 justify-center"><button id="cert-print" class="btn-primary"><i class="fas fa-print"></i>Cetak / simpan PDF</button></div>
+        </div>
+    </div>
+
+    <script src="/js/shared/money.js"></script>
+    <script src="/js/tutorial.js"></script>
+</body>
+</html>

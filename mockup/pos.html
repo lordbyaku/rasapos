@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kasir — RasaPOS (Mockup)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/style.css">
+    <script>tailwind.config = { theme: { extend: { colors: { brand: { 50: '#fff7ed', 100: '#ffedd5', 500: '#f97316', 600: '#ea580c', 700: '#c2410c' } } } } };</script>
+</head>
+<body class="bg-stone-100 text-stone-800 h-screen overflow-hidden flex flex-col">
+
+    <!-- HEADER -->
+    <header class="h-14 bg-white border-b border-stone-200 flex items-center px-3 gap-3 shrink-0">
+        <a href="index.html" class="w-9 h-9 rounded-xl bg-brand-500 text-white grid place-items-center font-extrabold">R</a>
+        <div class="leading-tight">
+            <div class="font-bold text-sm">Outlet Sudirman</div>
+            <div class="text-[11px] text-stone-500">Kopi &amp; Makan Nusantara · Kasir-01</div>
+        </div>
+
+        <nav class="ml-4 flex bg-stone-100 rounded-xl p-1 text-sm font-medium">
+            <a href="pos.html" class="px-3 py-1.5 rounded-lg bg-white shadow-sm text-brand-600"><i class="fas fa-cash-register mr-1.5"></i>Kasir</a>
+            <a href="tables.html" class="px-3 py-1.5 rounded-lg text-stone-600 hover:text-stone-900"><i class="fas fa-chair mr-1.5"></i>Meja</a>
+            <button onclick="openOpenOrders()" class="px-3 py-1.5 rounded-lg text-stone-600 hover:text-stone-900"><i class="fas fa-receipt mr-1.5"></i>Order Terbuka <span class="ml-1 bg-brand-500 text-white text-[10px] px-1.5 rounded-full">9</span></button>
+            <a href="kds.html" class="px-3 py-1.5 rounded-lg text-stone-600 hover:text-stone-900"><i class="fas fa-fire-burner mr-1.5"></i>Dapur</a>
+        </nav>
+
+        <div class="ml-auto flex items-center gap-2 text-xs">
+            <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold"><i class="fas fa-circle text-[7px] mr-1 align-middle"></i>Online</span>
+            <span class="px-2.5 py-1 rounded-full bg-stone-100 text-stone-600"><i class="fas fa-clock mr-1"></i>Shift 08:00 · Modal Rp 500.000</span>
+            <div class="flex items-center gap-2 pl-2 border-l border-stone-200">
+                <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-700 grid place-items-center font-bold">RN</div>
+                <div class="leading-tight hidden xl:block"><div class="font-semibold">Rina</div><div class="text-stone-500">Kasir</div></div>
+                <button class="w-8 h-8 rounded-lg hover:bg-stone-100 text-stone-500" title="Kunci (ganti kasir)"><i class="fas fa-lock"></i></button>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex min-h-0">
+        <!-- KATEGORI -->
+        <aside id="cat-list" class="w-24 bg-white border-r border-stone-200 overflow-y-auto no-scrollbar py-2 flex flex-col gap-1 shrink-0"></aside>
+
+        <!-- MENU GRID -->
+        <main class="flex-1 flex flex-col min-w-0">
+            <div class="p-3 flex gap-2 items-center">
+                <div class="relative flex-1">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"></i>
+                    <input id="search" oninput="renderMenus()" placeholder="Cari menu atau SKU…" class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/40">
+                </div>
+                <button class="px-3 py-2.5 rounded-xl bg-white border border-stone-200 text-sm"><i class="fas fa-star text-amber-400 mr-1"></i>Favorit</button>
+                <button class="px-3 py-2.5 rounded-xl bg-white border border-stone-200 text-sm"><i class="fas fa-pen mr-1"></i>Custom</button>
+            </div>
+            <div id="menu-grid" class="flex-1 overflow-y-auto thin-scroll px-3 pb-3 grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 content-start"></div>
+        </main>
+
+        <!-- KERANJANG -->
+        <section class="w-[380px] bg-white border-l border-stone-200 flex flex-col shrink-0">
+            <div class="p-3 border-b border-stone-200 space-y-2">
+                <div id="order-types" class="grid grid-cols-4 gap-1 bg-stone-100 p-1 rounded-xl text-xs font-semibold"></div>
+                <div class="flex gap-2 text-sm">
+                    <button id="table-btn" onclick="location.href='tables.html'" class="flex-1 px-3 py-2 rounded-xl border border-stone-200 text-left"><i class="fas fa-chair text-stone-400 mr-2"></i>Meja <b>A5</b></button>
+                    <div class="flex items-center border border-stone-200 rounded-xl">
+                        <button onclick="guest(-1)" class="w-8 h-9 text-stone-500">−</button>
+                        <span class="text-sm w-12 text-center"><i class="fas fa-user text-stone-400 text-xs"></i> <b id="guests">2</b></span>
+                        <button onclick="guest(1)" class="w-8 h-9 text-stone-500">+</button>
+                    </div>
+                </div>
+                <input placeholder="Nama pelanggan / no. antrean" class="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40">
+            </div>
+
+            <div class="flex items-center justify-between px-3 pt-2 text-xs text-stone-500">
+                <span>Order <b class="text-stone-700">#SDM-0215</b></span>
+                <button onclick="clearCart()" class="text-red-500 hover:underline"><i class="fas fa-trash-can mr-1"></i>Kosongkan</button>
+            </div>
+
+            <div id="cart" class="flex-1 overflow-y-auto thin-scroll px-3 py-2 space-y-2"></div>
+
+            <div class="border-t border-stone-200 p-3 space-y-1 text-sm">
+                <div class="flex justify-between"><span class="text-stone-500">Subtotal</span><span id="t-sub">Rp 0</span></div>
+                <div class="flex justify-between"><button onclick="toggleDiscount()" class="text-brand-600 font-medium"><i class="fas fa-tag mr-1"></i>Diskon <span id="disc-label"></span></button><span id="t-disc" class="text-red-500">- Rp 0</span></div>
+                <div class="flex justify-between" id="row-service"><span class="text-stone-500">Service 5%</span><span id="t-svc">Rp 0</span></div>
+                <div class="flex justify-between"><span class="text-stone-500">PBJT 10%</span><span id="t-tax">Rp 0</span></div>
+                <div class="flex justify-between"><span class="text-stone-500">Pembulatan</span><span id="t-round">Rp 0</span></div>
+                <div class="flex justify-between text-lg font-extrabold pt-1"><span>Total</span><span id="t-total">Rp 0</span></div>
+                <div class="grid grid-cols-5 gap-2 pt-2">
+                    <button onclick="sendKitchen()" class="col-span-2 py-3 rounded-xl border-2 border-brand-500 text-brand-600 font-bold text-sm tap"><i class="fas fa-paper-plane mr-1"></i>Kirim Dapur</button>
+                    <button onclick="openPayment()" class="col-span-3 py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold tap"><i class="fas fa-wallet mr-1"></i>Bayar <span id="pay-btn-total"></span></button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- MODAL MODIFIER -->
+    <div id="mod-modal" class="hidden fixed inset-0 modal-bg z-40 grid place-items-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-stone-200 flex items-center gap-3">
+                <div id="mod-emoji" class="w-12 h-12 rounded-xl grid place-items-center text-2xl"></div>
+                <div class="flex-1"><div id="mod-name" class="font-bold"></div><div id="mod-price" class="text-sm text-stone-500"></div></div>
+                <button onclick="closeModal('mod-modal')" class="w-9 h-9 rounded-lg hover:bg-stone-100"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div id="mod-body" class="p-4 overflow-y-auto thin-scroll space-y-4"></div>
+            <div class="p-4 border-t border-stone-200 flex items-center gap-3">
+                <div class="flex items-center border border-stone-200 rounded-xl">
+                    <button onclick="modQty(-1)" class="w-10 h-11">−</button><b id="mod-qty" class="w-8 text-center">1</b><button onclick="modQty(1)" class="w-10 h-11">+</button>
+                </div>
+                <button onclick="confirmMod()" class="flex-1 py-3 rounded-xl bg-brand-500 text-white font-bold tap">Tambah · <span id="mod-total"></span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PEMBAYARAN -->
+    <div id="pay-modal" class="hidden fixed inset-0 modal-bg z-40 grid place-items-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-4xl h-[88vh] flex overflow-hidden">
+            <div class="w-80 bg-stone-50 border-r border-stone-200 p-4 flex flex-col">
+                <div class="text-xs text-stone-500">Order #SDM-0215 · <span id="pay-type"></span></div>
+                <div class="text-sm text-stone-500 mt-4">Total Tagihan</div>
+                <div id="pay-total" class="text-3xl font-extrabold"></div>
+                <div class="mt-4 text-sm font-semibold">Pembayaran</div>
+                <div id="pay-lines" class="mt-2 space-y-2 flex-1 overflow-y-auto"></div>
+                <div class="border-t border-stone-200 pt-3 space-y-1 text-sm">
+                    <div class="flex justify-between"><span>Dibayar</span><b id="pay-paid">Rp 0</b></div>
+                    <div class="flex justify-between"><span>Sisa</span><b id="pay-remain" class="text-red-500">Rp 0</b></div>
+                    <div class="flex justify-between text-lg"><span>Kembalian</span><b id="pay-change" class="text-emerald-600">Rp 0</b></div>
+                </div>
+            </div>
+            <div class="flex-1 p-5 flex flex-col">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-lg">Pilih Metode Pembayaran</h3>
+                    <button onclick="closeModal('pay-modal')" class="w-9 h-9 rounded-lg hover:bg-stone-100"><i class="fas fa-xmark"></i></button>
+                </div>
+                <div id="pay-methods" class="grid grid-cols-5 gap-2 mt-3"></div>
+                <div class="mt-5 text-sm text-stone-500">Nominal (<span id="pay-method-label">Tunai</span>)</div>
+                <input id="pay-input" class="mt-1 text-3xl font-bold w-full border-b-2 border-brand-500 py-2 focus:outline-none" value="0" readonly>
+                <div id="quick-cash" class="grid grid-cols-4 gap-2 mt-3"></div>
+                <div class="grid grid-cols-3 gap-2 mt-3 flex-1">
+                    <script>document.write(['1','2','3','4','5','6','7','8','9','000','0','⌫'].map(k => `<button onclick="numpad('${k}')" class="rounded-xl bg-stone-100 hover:bg-stone-200 text-xl font-semibold tap">${k}</button>`).join(''))</script>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-3">
+                    <button onclick="addPayLine()" class="py-3 rounded-xl border-2 border-stone-300 font-bold tap"><i class="fas fa-plus mr-1"></i>Split Payment</button>
+                    <button onclick="finishPay()" class="py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold tap"><i class="fas fa-check mr-1"></i>Selesaikan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL SUKSES / STRUK -->
+    <div id="done-modal" class="hidden fixed inset-0 modal-bg z-50 grid place-items-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-3xl flex overflow-hidden">
+            <div class="flex-1 p-8 flex flex-col items-center justify-center text-center">
+                <div class="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 grid place-items-center text-4xl"><i class="fas fa-check"></i></div>
+                <h3 class="text-2xl font-extrabold mt-4">Pembayaran Berhasil</h3>
+                <div class="text-stone-500 mt-1">Kembalian</div>
+                <div id="done-change" class="text-4xl font-extrabold text-emerald-600"></div>
+                <div class="grid grid-cols-3 gap-2 mt-6 w-full">
+                    <button class="py-3 rounded-xl bg-stone-100 font-semibold"><i class="fas fa-print mr-1"></i>Cetak</button>
+                    <button class="py-3 rounded-xl bg-stone-100 font-semibold"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</button>
+                    <button class="py-3 rounded-xl bg-stone-100 font-semibold"><i class="fas fa-download mr-1"></i>PNG</button>
+                </div>
+                <button onclick="newOrder()" class="mt-3 w-full py-3 rounded-xl bg-brand-500 text-white font-bold">Order Baru</button>
+            </div>
+            <div class="w-72 bg-stone-100 p-4">
+                <div id="receipt" class="bg-white p-4 font-mono text-[11px] leading-snug shadow-sm"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ORDER TERBUKA -->
+    <div id="open-modal" class="hidden fixed inset-0 modal-bg z-40 grid place-items-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-stone-200 flex items-center"><h3 class="font-bold flex-1">Order Terbuka (9)</h3><button onclick="closeModal('open-modal')" class="w-9 h-9 rounded-lg hover:bg-stone-100"><i class="fas fa-xmark"></i></button></div>
+            <div id="open-list" class="p-3 overflow-y-auto thin-scroll grid grid-cols-2 gap-2"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-stone-900 text-white px-4 py-2.5 rounded-xl text-sm z-[60]"></div>
+
+    <script src="assets/data.js"></script>
+    <script>
+        const M = window.MOCK;
+        let activeCat = 'all', orderType = 'Dine-in', guests = 2, discountPct = 0;
+        let cart = [
+            { menu: M.menus[9], mods: ['Pedas', 'Telur Mata Sapi'], qty: 1, price: 40000, note: 'tanpa bawang', sent: true },
+            { menu: M.menus[0], mods: ['Regular', 'Ice', 'Less Sugar'], qty: 2, price: 25000, note: '', sent: true },
+            { menu: M.menus[14], mods: [], qty: 1, price: 22000, note: '', sent: false }
+        ];
+        let modState = null, payLines = [], payMethod = 'Tunai', payBuffer = '0';
+
+        function renderCats() {
+            document.getElementById('cat-list').innerHTML = M.categories.map(c => `
+                <button onclick="activeCat='${c.id}';renderCats();renderMenus()" class="mx-2 py-3 rounded-xl flex flex-col items-center gap-1 text-[11px] font-semibold tap ${activeCat === c.id ? 'bg-brand-500 text-white' : 'text-stone-600 hover:bg-stone-100'}">
+                    <i class="fas ${c.icon} text-lg"></i>${c.name}</button>`).join('');
+        }
+
+        function renderMenus() {
+            const q = document.getElementById('search').value.toLowerCase();
+            const list = M.menus.filter(m => (activeCat === 'all' || m.cat === activeCat) && m.name.toLowerCase().includes(q));
+            document.getElementById('menu-grid').innerHTML = list.map(m => `
+                <button ${m.soldOut ? 'disabled' : ''} onclick="pickMenu(${m.id})" class="relative bg-white rounded-2xl p-2 text-left border border-stone-200 hover:border-brand-500 tap ${m.soldOut ? 'opacity-50 cursor-not-allowed' : ''}">
+                    <div class="${m.color} rounded-xl h-20 grid place-items-center text-4xl">${m.emoji}</div>
+                    <div class="mt-2 text-sm font-semibold leading-tight line-clamp-2 h-9">${m.name}</div>
+                    <div class="flex items-center justify-between mt-1">
+                        <span class="text-brand-600 font-bold text-sm">${rp(m.price)}</span>
+                        ${m.mods.length ? '<i class="fas fa-sliders text-stone-300 text-xs" title="Ada pilihan"></i>' : ''}
+                    </div>
+                    ${m.soldOut ? '<span class="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">HABIS</span>' : ''}
+                </button>`).join('');
+        }
+
+        function renderOrderTypes() {
+            document.getElementById('order-types').innerHTML = M.orderTypes.map(t => `
+                <button onclick="orderType='${t}';renderOrderTypes();renderCart()" class="py-1.5 rounded-lg ${orderType === t ? 'bg-white shadow-sm text-brand-600' : 'text-stone-500'}">${t}</button>`).join('');
+            document.getElementById('table-btn').parentElement.style.display = orderType === 'Dine-in' ? '' : 'none';
+        }
+
+        function pickMenu(id) {
+            const m = M.menus.find(x => x.id === id);
+            if (!m.mods.length) return addToCart(m, [], m.price, 1);
+            modState = { menu: m, qty: 1, sel: {} };
+            m.mods.forEach(g => { const grp = M.modifierGroups[g]; modState.sel[g] = grp.required ? [0] : []; });
+            document.getElementById('mod-emoji').className = `w-12 h-12 rounded-xl grid place-items-center text-2xl ${m.color}`;
+            document.getElementById('mod-emoji').textContent = m.emoji;
+            document.getElementById('mod-name').textContent = m.name;
+            document.getElementById('mod-price').textContent = rp(m.price) + ' · Stasiun ' + m.station;
+            renderMod();
+            document.getElementById('mod-modal').classList.remove('hidden');
+        }
+
+        function renderMod() {
+            const m = modState.menu;
+            document.getElementById('mod-body').innerHTML = m.mods.map(g => {
+                const grp = M.modifierGroups[g];
+                return `<div>
+                    <div class="flex items-center justify-between mb-2"><b class="text-sm">${grp.name}</b>
+                    <span class="text-[11px] px-2 py-0.5 rounded-full ${grp.required ? 'bg-red-50 text-red-600' : 'bg-stone-100 text-stone-500'}">${grp.required ? 'Wajib' : 'Opsional'} · maks ${grp.max}</span></div>
+                    <div class="grid grid-cols-2 gap-2">${grp.options.map((o, i) => {
+                        const on = modState.sel[g].includes(i);
+                        return `<button onclick="toggleOpt('${g}',${i})" class="px-3 py-2.5 rounded-xl border-2 text-sm text-left flex justify-between ${on ? 'border-brand-500 bg-brand-50 font-semibold' : 'border-stone-200'}">
+                            <span>${o.name}</span><span class="text-stone-500">${o.price ? '+' + rp(o.price) : ''}</span></button>`;
+                    }).join('')}</div></div>`;
+            }).join('') + `<div><b class="text-sm">Catatan</b><input id="mod-note" placeholder="mis. tanpa bawang, dipisah" class="mt-2 w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm"></div>`;
+            document.getElementById('mod-qty').textContent = modState.qty;
+            document.getElementById('mod-total').textContent = rp(modUnitPrice() * modState.qty);
+        }
+
+        function toggleOpt(g, i) {
+            const grp = M.modifierGroups[g], s = modState.sel[g];
+            if (grp.max === 1) modState.sel[g] = [i];
+            else if (s.includes(i)) s.splice(s.indexOf(i), 1);
+            else if (s.length < grp.max) s.push(i);
+            const note = document.getElementById('mod-note')?.value || '';
+            renderMod();
+            document.getElementById('mod-note').value = note;
+        }
+
+        function modUnitPrice() {
+            let p = modState.menu.price;
+            Object.entries(modState.sel).forEach(([g, idx]) => idx.forEach(i => p += M.modifierGroups[g].options[i].price));
+            return p;
+        }
+        function modQty(d) { modState.qty = Math.max(1, modState.qty + d); document.getElementById('mod-qty').textContent = modState.qty; document.getElementById('mod-total').textContent = rp(modUnitPrice() * modState.qty); }
+        function confirmMod() {
+            const names = [];
+            Object.entries(modState.sel).forEach(([g, idx]) => idx.forEach(i => names.push(M.modifierGroups[g].options[i].name)));
+            addToCart(modState.menu, names, modUnitPrice(), modState.qty, document.getElementById('mod-note').value);
+            closeModal('mod-modal');
+        }
+
+        function addToCart(menu, mods, price, qty, note = '') {
+            const ex = cart.find(c => !c.sent && c.menu.id === menu.id && c.mods.join() === mods.join() && c.note === note);
+            if (ex) ex.qty += qty; else cart.push({ menu, mods, price, qty, note, sent: false });
+            renderCart();
+        }
+
+        function changeQty(i, d) {
+            const c = cart[i];
+            if (c.sent) return toast('Item sudah dikirim ke dapur — gunakan VOID (butuh PIN supervisor)');
+            c.qty += d; if (c.qty <= 0) cart.splice(i, 1); renderCart();
+        }
+
+        function totals() {
+            const sub = cart.reduce((s, c) => s + c.price * c.qty, 0);
+            const disc = Math.round(sub * discountPct / 100);
+            const svc = orderType === 'Dine-in' ? Math.round((sub - disc) * 0.05) : 0;
+            const tax = Math.round((sub - disc + svc) * 0.10);
+            const raw = sub - disc + svc + tax;
+            const total = Math.round(raw / 100) * 100;
+            return { sub, disc, svc, tax, round: total - raw, total };
+        }
+
+        function renderCart() {
+            const el = document.getElementById('cart');
+            el.innerHTML = cart.length ? cart.map((c, i) => `
+                <div class="rounded-xl border ${c.sent ? 'border-stone-200 bg-stone-50' : 'border-brand-100 bg-brand-50/40'} p-2.5">
+                    <div class="flex gap-2">
+                        <div class="flex-1 min-w-0">
+                            <div class="font-semibold text-sm">${c.menu.name}</div>
+                            ${c.mods.length ? `<div class="text-xs text-stone-500">${c.mods.join(', ')}</div>` : ''}
+                            ${c.note ? `<div class="text-xs text-amber-700"><i class="fas fa-note-sticky mr-1"></i>${c.note}</div>` : ''}
+                            <div class="text-[10px] mt-1 font-semibold ${c.sent ? 'text-emerald-600' : 'text-brand-600'}">${c.sent ? '<i class="fas fa-check-double mr-1"></i>Terkirim ke ' + c.menu.station : '<i class="fas fa-circle text-[6px] mr-1 align-middle"></i>Baru'}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-bold text-sm">${rp(c.price * c.qty)}</div>
+                            <div class="flex items-center gap-1 mt-1 justify-end">
+                                <button onclick="changeQty(${i},-1)" class="w-7 h-7 rounded-lg bg-white border border-stone-200 text-xs">${c.qty === 1 && !c.sent ? '<i class="fas fa-trash text-red-500"></i>' : '−'}</button>
+                                <span class="w-6 text-center text-sm font-semibold">${c.qty}</span>
+                                <button onclick="changeQty(${i},1)" class="w-7 h-7 rounded-lg bg-white border border-stone-200 text-xs">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`).join('') : `<div class="h-full grid place-items-center text-stone-400 text-sm text-center"><div><i class="fas fa-basket-shopping text-4xl mb-2"></i><div>Belum ada item</div></div></div>`;
+
+            const t = totals();
+            document.getElementById('t-sub').textContent = rp(t.sub);
+            document.getElementById('t-disc').textContent = '- ' + rp(t.disc);
+            document.getElementById('disc-label').textContent = discountPct ? `(${discountPct}%)` : '';
+            document.getElementById('t-svc').textContent = rp(t.svc);
+            document.getElementById('row-service').style.opacity = orderType === 'Dine-in' ? 1 : .4;
+            document.getElementById('t-tax').textContent = rp(t.tax);
+            document.getElementById('t-round').textContent = rp(t.round);
+            document.getElementById('t-total').textContent = rp(t.total);
+            document.getElementById('pay-btn-total').textContent = rp(t.total);
+        }
+
+        function guest(d) { guests = Math.max(1, guests + d); document.getElementById('guests').textContent = guests; }
+        function toggleDiscount() { discountPct = discountPct === 0 ? 10 : discountPct === 10 ? 20 : 0; renderCart(); toast(discountPct ? `Diskon ${discountPct}% diterapkan (perlu izin supervisor jika > 10%)` : 'Diskon dihapus'); }
+        function clearCart() { cart = cart.filter(c => c.sent); renderCart(); toast('Item baru dihapus. Item terkirim hanya bisa di-void.'); }
+        function sendKitchen() {
+            const n = cart.filter(c => !c.sent);
+            if (!n.length) return toast('Tidak ada item baru untuk dikirim');
+            const stations = [...new Set(n.map(c => c.menu.station))];
+            n.forEach(c => c.sent = true); renderCart();
+            toast(`Tiket dikirim ke: ${stations.join(', ')} · ${n.length} item`);
+        }
+
+        // ---------- Pembayaran ----------
+        function openPayment() {
+            if (!cart.length) return toast('Keranjang kosong');
+            payLines = []; payMethod = 'Tunai'; payBuffer = '0';
+            document.getElementById('pay-type').textContent = orderType + (orderType === 'Dine-in' ? ' · Meja A5' : '');
+            renderPay();
+            document.getElementById('pay-modal').classList.remove('hidden');
+        }
+        function remaining() { return totals().total - payLines.reduce((s, p) => s + p.amount, 0); }
+        function renderPay() {
+            const t = totals().total;
+            document.getElementById('pay-total').textContent = rp(t);
+            document.getElementById('pay-methods').innerHTML = M.payMethods.map(m => `
+                <button onclick="selectMethod('${m}')" class="py-3 rounded-xl border-2 text-sm font-semibold tap ${payMethod === m ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-stone-200'}">
+                <i class="fas ${m === 'Tunai' ? 'fa-money-bill-wave' : m === 'QRIS' ? 'fa-qrcode' : m.startsWith('Debit') ? 'fa-credit-card' : 'fa-wallet'} block text-lg mb-1"></i>${m}</button>`).join('');
+            document.getElementById('pay-method-label').textContent = payMethod;
+            const rem = Math.max(0, remaining());
+            const quick = payMethod === 'Tunai' ? [rem, 50000, 100000, 150000, 200000, 300000, 500000].filter((v, i, a) => v >= rem && a.indexOf(v) === i).slice(0, 4) : [rem];
+            document.getElementById('quick-cash').innerHTML = quick.map((v, i) => `<button onclick="payBuffer='${v}';renderPay()" class="py-2.5 rounded-xl bg-brand-50 text-brand-700 font-semibold text-sm">${i === 0 ? 'Uang Pas' : rp(v)}</button>`).join('');
+            document.getElementById('pay-input').value = rp(+payBuffer);
+            document.getElementById('pay-lines').innerHTML = payLines.map((p, i) => `<div class="flex justify-between bg-white rounded-lg px-3 py-2 text-sm border border-stone-200"><span>${p.method}</span><span class="font-semibold">${rp(p.amount)} <button onclick="payLines.splice(${i},1);renderPay()" class="ml-1 text-red-500"><i class="fas fa-xmark"></i></button></span></div>`).join('') || '<div class="text-xs text-stone-400">Belum ada pembayaran</div>';
+            const paid = payLines.reduce((s, p) => s + p.amount, 0) + (+payBuffer);
+            document.getElementById('pay-paid').textContent = rp(paid);
+            document.getElementById('pay-remain').textContent = rp(Math.max(0, t - paid));
+            document.getElementById('pay-change').textContent = rp(Math.max(0, paid - t));
+        }
+        function selectMethod(m) { payMethod = m; payBuffer = m === 'Tunai' ? '0' : String(Math.max(0, remaining())); renderPay(); }
+        function numpad(k) {
+            if (k === '⌫') payBuffer = payBuffer.slice(0, -1) || '0';
+            else payBuffer = (payBuffer === '0' ? '' : payBuffer) + k;
+            renderPay();
+        }
+        function addPayLine() {
+            if (+payBuffer <= 0) return toast('Masukkan nominal dulu');
+            payLines.push({ method: payMethod, amount: Math.min(+payBuffer, remaining()) });
+            payBuffer = '0'; payMethod = 'QRIS'; selectMethod('QRIS');
+        }
+        function finishPay() {
+            const t = totals().total;
+            const paid = payLines.reduce((s, p) => s + p.amount, 0) + (+payBuffer);
+            if (paid < t) return toast('Pembayaran kurang ' + rp(t - paid));
+            if (+payBuffer > 0) payLines.push({ method: payMethod, amount: +payBuffer });
+            closeModal('pay-modal');
+            document.getElementById('done-change').textContent = rp(paid - t);
+            renderReceipt(paid);
+            document.getElementById('done-modal').classList.remove('hidden');
+        }
+        function renderReceipt(paid) {
+            const t = totals();
+            const line = (a, b) => `<div class="flex justify-between"><span>${a}</span><span>${b}</span></div>`;
+            document.getElementById('receipt').innerHTML = `
+                <div class="text-center font-bold">KOPI &amp; MAKAN NUSANTARA</div>
+                <div class="text-center">Outlet Sudirman<br>Jl. Jend. Sudirman No. 21</div>
+                <div class="border-t border-dashed my-2"></div>
+                ${line('#SDM-0215', '02/10/26 14:32')}${line('Kasir: Rina', orderType)}
+                ${orderType === 'Dine-in' ? line('Meja A5', guests + ' tamu') : ''}
+                <div class="border-t border-dashed my-2"></div>
+                ${cart.map(c => `<div>${c.menu.name}</div>${c.mods.length ? `<div class="pl-2 text-stone-500">${c.mods.join(', ')}</div>` : ''}${line('  ' + c.qty + ' x ' + c.price.toLocaleString('id-ID'), (c.qty * c.price).toLocaleString('id-ID'))}`).join('')}
+                <div class="border-t border-dashed my-2"></div>
+                ${line('Subtotal', t.sub.toLocaleString('id-ID'))}${t.disc ? line('Diskon', '-' + t.disc.toLocaleString('id-ID')) : ''}
+                ${t.svc ? line('Service 5%', t.svc.toLocaleString('id-ID')) : ''}${line('PBJT 10%', t.tax.toLocaleString('id-ID'))}${line('Pembulatan', t.round.toLocaleString('id-ID'))}
+                <div class="font-bold">${line('TOTAL', t.total.toLocaleString('id-ID'))}</div>
+                ${payLines.map(p => line(p.method, p.amount.toLocaleString('id-ID'))).join('')}
+                ${line('Kembali', (paid - t.total).toLocaleString('id-ID'))}
+                <div class="border-t border-dashed my-2"></div>
+                <div class="text-center">WiFi: nusantara / ngopidulu<br>Terima kasih 🙏</div>`;
+        }
+        function newOrder() { cart = []; discountPct = 0; closeModal('done-modal'); renderCart(); }
+
+        function openOpenOrders() {
+            const open = M.tables.filter(t => ['ordered', 'bill', 'seated'].includes(t.status));
+            const ta = [{ name: 'TA-031 · Andi', type: 'Take Away', mins: 6, total: 64000 }, { name: 'GF-118', type: 'GoFood', mins: 9, total: 112000 }];
+            document.getElementById('open-list').innerHTML = [...open.map(t => ({ name: 'Meja ' + t.name, type: 'Dine-in · ' + t.guests + ' tamu', mins: t.mins, total: t.total, bill: t.status === 'bill' })), ...ta].map(o => `
+                <button onclick="closeModal('open-modal');toast('Membuka ${o.name}…')" class="text-left p-3 rounded-xl border border-stone-200 hover:border-brand-500">
+                    <div class="flex justify-between"><b>${o.name}</b>${o.bill ? '<span class="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">MINTA BILL</span>' : ''}</div>
+                    <div class="text-xs text-stone-500">${o.type} · ${o.mins} mnt</div>
+                    <div class="font-bold text-brand-600 mt-1">${rp(o.total)}</div></button>`).join('');
+            document.getElementById('open-modal').classList.remove('hidden');
+        }
+
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        let toastT;
+        function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.add('hidden'), 2600); }
+
+        renderCats(); renderMenus(); renderOrderTypes(); renderCart();
+    </script>
+</body>
+</html>

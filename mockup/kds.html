@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitchen Display — RasaPOS (Mockup)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="bg-neutral-950 text-neutral-100 h-screen overflow-hidden flex flex-col">
+
+    <header class="h-14 bg-neutral-900 border-b border-neutral-800 flex items-center px-4 gap-4 shrink-0">
+        <a href="index.html" class="w-9 h-9 rounded-xl bg-orange-500 text-white grid place-items-center font-extrabold">R</a>
+        <div class="leading-tight"><div class="font-bold">Kitchen Display</div><div class="text-[11px] text-neutral-400">Outlet Sudirman</div></div>
+        <div id="stations" class="ml-4 flex bg-neutral-800 rounded-xl p-1 text-sm font-semibold"></div>
+        <div class="ml-auto flex items-center gap-4 text-sm">
+            <span><b id="cnt-new" class="text-sky-400"></b> baru</span>
+            <span><b id="cnt-prog" class="text-amber-400"></b> diproses</span>
+            <span class="text-neutral-400">Rata-rata saji <b class="text-white">11 mnt</b></span>
+            <button onclick="toast('Menampilkan 20 tiket terakhir yang selesai')" class="px-3 py-1.5 rounded-lg bg-neutral-800"><i class="fas fa-clock-rotate-left mr-1"></i>Riwayat</button>
+            <span id="clock" class="font-mono text-lg"></span>
+        </div>
+    </header>
+
+    <main id="board" class="flex-1 overflow-x-auto thin-scroll p-4 flex gap-4 items-start"></main>
+
+    <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-white text-black px-4 py-2.5 rounded-xl text-sm z-[60]"></div>
+
+    <script>
+        let station = 'Semua';
+        const tickets = [
+            { no: 41, order: 'Meja A8', type: 'Dine-in', station: 'Dapur', mins: 23, status: 'progress', waiter: 'Budi', items: [['2', 'Nasi Goreng Kampung', 'Pedas · Telur Mata Sapi', 'tanpa bawang'], ['1', 'Ayam Bakar Madu', 'Sedang', ''], ['3', 'Mie Goreng Jawa', 'Tidak Pedas', '']] },
+            { no: 42, order: 'GF-118 · GoFood', type: 'Online', station: 'Dapur', mins: 14, status: 'progress', waiter: '-', items: [['1', 'Paket Hemat Geprek + Es Teh', 'Extra Pedas', ''], ['1', 'Tahu Cabe Garam', 'Pedas', '']] },
+            { no: 43, order: 'Meja C1', type: 'Dine-in', station: 'Bar', mins: 9, status: 'progress', waiter: 'Rizky', items: [['4', 'Kopi Susu Gula Aren', 'Large · Ice', ''], ['2', 'Matcha Latte', 'Regular · Ice · Oat Milk', ''], ['3', 'Es Teh Leci', 'Less Sugar', '']] },
+            { no: 44, order: 'TA-031 · Andi', type: 'Take Away', station: 'Bar', mins: 6, status: 'new', waiter: '-', items: [['2', 'Americano', 'Regular · Hot', ''], ['1', 'Croissant Butter', '', 'dipanaskan']] },
+            { no: 45, order: 'Meja B1', type: 'Dine-in', station: 'Dapur', mins: 4, status: 'new', waiter: 'Ayu', items: [['1', 'Kentang Goreng', '', ''], ['1', 'Pisang Goreng Keju', '', '']] },
+            { no: 46, order: 'Meja A2', type: 'Dine-in', station: 'Dapur', mins: 1, status: 'new', waiter: 'Budi', items: [['2', 'Nasi Ayam Geprek', 'Sedang · Keju', ''], ['1', 'Nasi Goreng Kampung', 'Tidak Pedas', 'untuk anak']], tambahan: true },
+            { no: 47, order: 'Meja A2', type: 'Dine-in', station: 'Bar', mins: 1, status: 'new', waiter: 'Budi', items: [['2', 'Coklat Signature', 'Regular · Ice', '']] }
+        ];
+        const done = {};
+
+        function render() {
+            document.getElementById('stations').innerHTML = ['Semua', 'Dapur', 'Bar', 'Pastry'].map(s => `<button onclick="station='${s}';render()" class="px-4 py-1.5 rounded-lg ${station === s ? 'bg-orange-500 text-white' : 'text-neutral-400'}">${s}</button>`).join('');
+            const list = tickets.filter(t => station === 'Semua' || t.station === station);
+            document.getElementById('cnt-new').textContent = list.filter(t => t.status === 'new').length;
+            document.getElementById('cnt-prog').textContent = list.filter(t => t.status === 'progress').length;
+            document.getElementById('board').innerHTML = list.map(t => {
+                const col = t.mins >= 20 ? 'bg-red-600' : t.mins >= 10 ? 'bg-amber-500' : 'bg-emerald-600';
+                return `<div class="w-72 shrink-0 bg-neutral-900 rounded-2xl overflow-hidden border ${t.status === 'new' ? 'border-sky-500' : 'border-neutral-800'}">
+                    <div class="${col} px-3 py-2 flex items-center justify-between">
+                        <div><div class="font-extrabold text-lg leading-tight">${t.order}</div><div class="text-xs opacity-90">#${t.no} · ${t.type} · ${t.station}</div></div>
+                        <div class="text-right"><div class="font-mono text-xl font-bold ${t.mins >= 20 ? 'blink' : ''}">${String(t.mins).padStart(2, '0')}:${String((t.no * 7) % 60).padStart(2, '0')}</div><div class="text-[10px] opacity-90">${t.waiter !== '-' ? 'Waiter ' + t.waiter : ''}</div></div>
+                    </div>
+                    ${t.tambahan ? '<div class="bg-sky-500/20 text-sky-300 text-xs font-bold px-3 py-1"><i class="fas fa-plus mr-1"></i>PESANAN TAMBAHAN</div>' : ''}
+                    <div class="p-3 space-y-2">${t.items.map((i, k) => {
+                        const key = t.no + '-' + k, d = done[key];
+                        return `<button onclick="done['${key}']=!done['${key}'];render()" class="w-full text-left flex gap-2 ${d ? 'opacity-40 line-through' : ''}">
+                            <span class="w-7 h-7 shrink-0 rounded-lg bg-neutral-800 grid place-items-center font-bold">${i[0]}</span>
+                            <span><span class="font-semibold">${i[1]}</span>${i[2] ? `<div class="text-xs text-neutral-400">${i[2]}</div>` : ''}${i[3] ? `<div class="text-xs text-amber-400 font-semibold"><i class="fas fa-note-sticky mr-1"></i>${i[3]}</div>` : ''}</span></button>`;
+                    }).join('')}</div>
+                    <div class="p-3 pt-0">
+                        ${t.status === 'new'
+                            ? `<button onclick="setStatus(${t.no},'progress')" class="w-full py-3 rounded-xl bg-sky-600 font-bold tap"><i class="fas fa-fire mr-1"></i>Mulai Masak</button>`
+                            : `<button onclick="setStatus(${t.no},'ready')" class="w-full py-3 rounded-xl bg-emerald-600 font-bold tap"><i class="fas fa-bell-concierge mr-1"></i>Siap Diantar</button>`}
+                    </div>
+                </div>`;
+            }).join('') || '<div class="m-auto text-neutral-500">Tidak ada tiket</div>';
+        }
+
+        function setStatus(no, s) {
+            const t = tickets.find(x => x.no === no);
+            if (s === 'ready') { tickets.splice(tickets.indexOf(t), 1); toast(`${t.order} siap — notifikasi dikirim ke kasir/waiter`); }
+            else t.status = s;
+            render();
+        }
+
+        setInterval(() => document.getElementById('clock').textContent = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }), 1000);
+        let toastT;
+        function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.add('hidden'), 2400); }
+        render();
+    </script>
+</body>
+</html>
