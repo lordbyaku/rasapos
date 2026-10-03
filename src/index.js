@@ -8,6 +8,7 @@ import { authRouter, bearer } from './auth.js';
 import { adminRouter } from './admin.js';
 import { coreTenantRouter } from './core-tenant.js';
 import { forwardToDO, doKeyOf } from './do-client.js';
+import { handleAssist } from './assist.js';
 
 export { TenantDO } from './tenant/tenant-do.js';
 
@@ -49,6 +50,9 @@ async function handleApi(request, env, url) {
         if (!m) throw notFound('Endpoint tidak ditemukan');
         return m.handler(request, env, a, m.params);
     }
+
+    // Asisten panduan (Gemini): status publik, pertanyaan wajib login akun atau perangkat
+    if (path === '/assist') return handleAssist(request, env, () => authContext(env, bearer(request)));
 
     // File publik (foto menu) — id acak, tanpa auth agar bisa dipakai di <img>
     const file = path.match(/^\/f\/(\d+)\/([\w-]+)$/);

@@ -1,5 +1,5 @@
 // Service worker: app shell cache-first (aman offline), API selalu ke jaringan, foto menu di-cache permanen.
-const VERSION = '1.0.0+202610022235';
+const VERSION = '1.1.0+202610030319';
 const CACHE = 'rasapos-' + VERSION;
 const IMG_CACHE = 'rasapos-img';
 
@@ -19,7 +19,7 @@ const SHELL = [
     '/js/backoffice/menu.js', '/js/backoffice/outlets.js', '/js/backoffice/staff.js', '/js/backoffice/inventory.js',
     '/js/backoffice/marketing.js', '/js/backoffice/settings.js',
     '/js/admin/app.js',
-    '/tutorial.html', '/js/tutorial.js'
+    '/tutorial.html', '/js/tutorial-content.js', '/js/tutorial.js', '/js/tutorial-chat.js', '/js/shared/tutorial-search.js'
 ];
 
 self.addEventListener('install', event => {

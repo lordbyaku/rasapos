@@ -4,3 +4,5 @@ JWT_SECRET=ganti-dengan-string-acak-minimal-32-karakter
 RESEND_API_KEY=
 # Superadmin khusus lokal (menimpa nilai di wrangler.jsonc)
 SUPERADMIN_EMAILS=admin@rasapos.local
+# Opsional: asisten panduan AI (kunci gratis dari https://aistudio.google.com/apikey)
+GEMINI_API_KEY=

@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0] — 2026-10-03
+
+### Baru
+- **Asisten "Tanya Panduan"** di halaman tutorial (tombol mengambang, layar penuh di HP).
+  - Pencarian panduan berbahasa Indonesia (BM25 + sinonim istilah kasir: void/batal, struk/nota, QRIS/non-tunai, dll.).
+    Gratis, tanpa login, tetap jalan offline. Jawaban berisi potongan pelajaran + tautan langsung ke pelajarannya.
+  - Jawaban AI opsional lewat **Gemini** (`POST /api/assist`): Worker memilih potongan panduan yang relevan, Gemini merangkum
+    jawaban hanya dari potongan tersebut dan mencantumkan sumbernya. Aktif bila secret `GEMINI_API_KEY` diisi;
+    wajib login akun/perangkat; dibatasi per usaha (`AI_TENANT_DAILY`) dan total (`AI_DAILY_LIMIT`).
+    Gagal/kuota habis/offline → otomatis kembali ke pencarian.
+- Isi panduan dipisah ke `public/js/tutorial-content.js` (dipakai halaman tutorial dan Worker).
+
+
 ## [1.0.1] — 2026-10-03
 
 Hasil simulasi menyeluruh (`npm run scenarios`, 82 skenario: harga, modifier, void, diskon, promo, pembayaran,

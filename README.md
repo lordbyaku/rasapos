@@ -12,7 +12,7 @@ Dokumen: [PLAN-CLOUDFLARE.md](PLAN-CLOUDFLARE.md) · [CHANGELOG.md](CHANGELOG.md
 | `/pos.html` | Kasir/waiter di tablet (PIN staff) |
 | `/kds.html` | Layar dapur |
 | `/admin.html` | Superadmin (kelola tenant & langganan) |
-| `/tutorial.html` | Panduan & training interaktif per peran (simulasi, kuis, sertifikat) |
+| `/tutorial.html` | Panduan & training interaktif per peran (simulasi, kuis, sertifikat) + asisten "Tanya Panduan" |
 
 ## Menjalankan lokal
 Butuh Node.js 20+.
@@ -52,6 +52,17 @@ npm run scenarios
 6. Daftar dengan email superadmin di aplikasi.
 
 Opsional: backup harian ke R2 (aktifkan blok `r2_buckets` di `wrangler.jsonc`).
+
+## Asisten panduan (Tanya Panduan)
+Tombol **Tanya Panduan** di `/tutorial.html` menjawab pertanyaan dari isi panduan.
+- **Tanpa pengaturan apa pun:** pencarian panduan (gratis, jalan offline) — menampilkan potongan pelajaran paling relevan + tautan ke pelajarannya.
+- **Opsional, jawaban AI (Gemini, gratis):** buat API key di [Google AI Studio](https://aistudio.google.com/apikey), lalu
+  ```bash
+  npx wrangler secret put GEMINI_API_KEY
+  ```
+  Jawaban AI hanya untuk pengguna yang login (akun Back Office atau tablet yang sudah dipasangkan); tanpa login/offline/kuota habis otomatis kembali ke pencarian.
+  Atur di `wrangler.jsonc`: `GEMINI_MODEL`, `AI_TENANT_DAILY` (batas pertanyaan per usaha per 24 jam, default 60), `AI_DAILY_LIMIT` (batas semua usaha, default 900 — di bawah kuota harian gratis Gemini).
+  Catatan: di tier gratis, Google boleh memakai isi pertanyaan untuk meningkatkan produknya — jangan ketik data pribadi/rahasia di chat.
 
 ## Tablet & printer
 - Android + **Chrome ≥ 138**, buka aplikasi lalu "Install/Tambahkan ke layar utama".

@@ -85,3 +85,17 @@ test('aturan baru: qty ketat, diskon persen maks 100, nominal negatif, tunai Rp 
     assert.equal(paid.rounding, -40);
     assert.equal(paid.payments.length, 1);
 });
+
+test('pencarian panduan: pertanyaan umum menemukan pelajaran yang tepat', async () => {
+    await import('../public/js/tutorial-content.js');
+    await import('../public/js/shared/tutorial-search.js');
+    const { MODULES, FAQ } = globalThis.RasaTutorial;
+    const S = globalThis.TutorialSearch;
+    const idx = S.buildIndex(MODULES, FAQ);
+    const top = q => S.search(idx, q, 3).map(h => h.doc.id);
+    assert.equal(top('lupa pin')[0], 'faq:0');
+    assert.ok(top('internet mati bisa jualan?').some(id => id.startsWith('offline:')));
+    assert.ok(top('cara split bill').includes('tables:2'));
+    assert.ok(top('printer bluetooth tidak bisa cetak')[0].startsWith('printer:'));
+    assert.deepEqual(S.search(idx, 'yang dan di', 3), []);
+});
