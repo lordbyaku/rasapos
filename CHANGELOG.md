@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.1] — 2026-10-03
+
+Simulasi lanjutan fitur per tenant (96 skenario + 13 uji round robin AI, 3× berturut-turut lulus).
+
+### Perbaikan
+- Meja nonaktif: pasang/pindah meja dari tablet yang belum memuat ulang data kini ditolak jelas saat online (sebelumnya diterima). Operasi offline tetap diterima.
+- Pelanggan nonaktif: id pelanggan juga dibuang saat **buka order** (sebelumnya hanya saat ubah order).
+- Inventori dinyalakan lagi setelah sempat nonaktif: Back Office menampilkan **pengingat stock opname** beserta periodenya (bisa ditutup setelah opname).
+- Asisten AI: tenant yang fiturnya dimatikan mendapat pesan "tidak aktif untuk usaha Anda" (sebelumnya tertutup pesan "belum diaktifkan").
+- Status fitur di panel superadmin diselaraskan ulang dari tenant setiap malam / saat "Perbarui statistik"; kegagalan pencatatan memberi pesan jelas.
+
+### Pengujian
+- Skenario N1–N10: promo & pelanggan saat offline, order berjalan saat fitur dimatikan, WebSocket KDS ditolak, tiket dapur tetap untuk printer, pengingat opname, AI per usaha, input superadmin aneh, cermin panel menyimpang, semua fitur mati sekaligus.
+- test/ai-keys.test.js: giliran merata, limit per menit/harian, kunci ditolak, gangguan jaringan, model salah, semua kunci istirahat, secret berganti, 30 permintaan bersamaan.
+
 ## [1.3.0] — 2026-10-03
 
 ### Baru

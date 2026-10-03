@@ -386,6 +386,14 @@ function applyOrderOp(t, a, op, approval, events) {
     const payload = { ...(op.payload || {}) };
     if (approval) payload.approved_by = approval.id;
 
+    // Fitur yang dimatikan superadmin. Operasi offline dari tablet yang belum tahu tetap diterima
+    // (aturan offline: yang sudah terjadi di outlet dicatat), operasi online ditolak dengan jelas.
+    const feat = features(t);
+    if (!feat.marketing && payload.customer_id) payload.customer_id = null; // cukup nama pemesan
+    if (!feat.tables && payload.table_id && ['order.open', 'order.set', 'order.move'].includes(type) && !op.offline) {
+        throw OpError('feature_disabled', 'Fitur meja tidak aktif untuk usaha ini. Muat ulang data tablet.');
+    }
+
     switch (type) {
         case 'order.open': {
             const ch = channelOf(t, payload.channel || 'take_away');
@@ -419,7 +427,6 @@ function applyOrderOp(t, a, op, approval, events) {
                 const tb = tableOf(t, outletId, payload.table_id);
                 payload.table_name = tb ? tb.name : null;
             }
-            if (payload.customer_id && !features(t).marketing) payload.customer_id = null; // data pelanggan nonaktif: cukup nama
             if (payload.customer_id) {
                 const c = t.db.one('SELECT id, name FROM customers WHERE id = ?', Number(payload.customer_id));
                 if (!c) throw OpError('customer_not_found', 'Pelanggan tidak ditemukan');

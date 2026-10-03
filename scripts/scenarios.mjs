@@ -799,6 +799,146 @@ await t('M4 hanya superadmin yang bisa mengubah fitur', async () => {
 });
 
 // =====================================================================================
+// N. FITUR: KASUS TEPI (offline, order berjalan, realtime, cermin panel, input admin)
+// =====================================================================================
+const withFeatures = async (f, fn) => { await setFeatures(f); try { return await fn(); } finally { await setFeatures(Object.fromEntries(Object.keys(f).map(k => [k, true]))); } };
+const audits = async action => (await ok('GET', `/t/audit?outlet=${o1.id}`, null, U)).items.filter(x => x.action === action);
+const offline = () => ({ offline: true, at: Date.now() - 60000 });
+
+await t('N1 tablet offline memakai promo setelah promo dimatikan: diterima & dicatat audit', async () => {
+    const before = (await audits('promo_mismatch')).length;
+    await withFeatures({ marketing: false }, async () => {
+        const id = randomUUID();
+        const r = await ops(K1, [
+            op('order.open', id, { id, order_no: no(d1), channel: 'take_away' }, offline()),
+            op('order.add_items', id, { items: [item(mNasi, { qty: 2 })] }, offline()),
+            op('order.discount', id, { discount: { type: 'percent', value: 10, name: 'Member 10%', promo_id: promoManual.id } }, offline())
+        ]);
+        r.forEach(x => expectOk(x));
+        assert.equal(r[2].order.discount.promo_id, promoManual.id, 'diskon offline dipertahankan');
+        expectOk(await one(K1, op('order.pay', id, { payments: [{ method: 'qris', amount: r[2].order.totals.total }] })));
+    });
+    assert.equal((await audits('promo_mismatch')).length, before + 1);
+});
+await t('N2 pelanggan saat fitur pelanggan mati: id dibuang (online & offline), nama tetap', async () => {
+    await withFeatures({ marketing: false }, async () => {
+        const a = randomUUID(), b = randomUUID();
+        const r1 = expectOk(await one(K1, op('order.open', a, { id: a, order_no: no(d1), channel: 'take_away', customer_id: cust.id, customer_name: 'Bu Ani' })));
+        assert.equal(r1.order.customer_id, null); assert.equal(r1.order.customer_name, 'Bu Ani');
+        const r2 = expectOk(await one(K1, op('order.open', b, { id: b, order_no: no(d1), channel: 'take_away', customer_id: 999999 }, offline())));
+        assert.equal(r2.order.customer_id, null, 'id tidak dikenal pun tidak membuat antrean macet');
+        for (const id of [a, b]) expectOk(await one(M1, op('order.void', id, { reason: 'uji' })));
+    });
+});
+await t('N3 order bermember dibuat sebelum promo dimatikan: dibayar tanpa poin, diskon tetap', async () => {
+    const pts = (await ok('GET', '/t/customers?q=Setia', null, U)).items[0].points;
+    const { id } = await orderWith(K1, d1, [item(mNasi, { qty: 2 })]);
+    expectOk(await one(K1, op('order.set', id, { customer_id: cust.id })));
+    const disc = expectOk(await one(K1, op('order.discount', id, { discount: { promo_id: promoManual.id } })));
+    await withFeatures({ marketing: false }, async () => {
+        const r = expectOk(await one(K1, op('order.pay', id, { payments: [{ method: 'qris', amount: disc.order.totals.total }] })));
+        assert.equal(r.order.discount.promo_id, promoManual.id);
+    });
+    assert.equal((await ok('GET', '/t/customers?q=Setia', null, U)).items[0].points, pts, 'poin tidak bertambah');
+});
+await t('N4 meja dimatikan: pasang/pindah meja online ditolak, offline diterima, order lama bermeja tetap bisa dibayar', async () => {
+    const old = await orderWith(K1, d1, [item(mAir)], { channel: 'dine_in', table_id: table('A8').id, guests: 2 });
+    await withFeatures({ tables: false }, async () => {
+        const id = randomUUID();
+        expectCode(await one(K1, op('order.open', id, { id, order_no: no(d1), channel: 'dine_in', table_id: table('A9').id })), 'feature_disabled');
+        expectCode(await one(K1, op('order.move', old.id, { table_id: table('A9').id })), 'feature_disabled');
+        expectCode(await one(K1, op('order.set', old.id, { table_id: table('A10').id })), 'feature_disabled');
+        const off = randomUUID();
+        const r = expectOk(await one(K1, op('order.open', off, { id: off, order_no: no(d1), channel: 'dine_in', table_id: table('A9').id }, offline())));
+        assert.equal(r.order.table_name, 'A9');
+        expectOk(await one(M1, op('order.void', off, { reason: 'uji' })));
+        expectOk(await one(K1, op('order.pay', old.id, { payments: [{ method: 'qris', amount: old.total }] })));
+    });
+});
+await t('N5 KDS dimatikan: koneksi realtime layar dapur ditolak; tiket tetap dibuat untuk printer kasir', async () => {
+    const wsUrl = BASE.replace(/^http/, 'ws') + '/api/ws?token=' + encodeURIComponent(dk.H.authorization.slice(7));
+    const tryWs = () => new Promise(res => {
+        const ws = new WebSocket(wsUrl);
+        let settled = false;
+        const done = v => { if (settled) return; settled = true; try { ws.close(); } catch { } res(v); };
+        ws.onopen = () => done('open'); ws.onerror = () => done('error');
+        setTimeout(() => done('timeout'), 5000);
+    });
+    assert.equal(await tryWs(), 'open', 'sebelum dimatikan bisa tersambung');
+    await withFeatures({ kds: false }, async () => {
+        assert.equal(await tryWs(), 'error', 'ditolak saat KDS nonaktif');
+        const { id, total } = await orderWith(K1, d1, [item(mNasi)]);
+        expectOk(await one(K1, op('order.send', id, {})));
+        const tk = await ok('GET', `/t/tickets?outlet=${o1.id}`, null, U);
+        assert.ok(tk.active.some(x => x.order_id === id), 'tiket dapur tetap ada (untuk cetak "semua tiket")');
+        expectOk(await one(K1, op('order.pay', id, { payments: [{ method: 'qris', amount: total }] })));
+    });
+});
+await t('N6 inventori dimatikan lalu dinyalakan: muncul pengingat stock opname, bisa ditutup', async () => {
+    const prev = (await ok('GET', `/t/stock?outlet=${o1.id}`, null, U)).gap;
+    assert.ok(prev, 'M1 sempat mematikan inventori → pengingat sudah ada');
+    await ok('POST', '/t/stock/gap/dismiss', {}, U);
+    assert.equal((await ok('GET', `/t/stock?outlet=${o1.id}`, null, U)).gap, null);
+    const t0 = Date.now();
+    await setFeatures({ inventory: false });
+    assert.equal((await call('POST', '/t/stock/gap/dismiss', {}, U)).status, 403);
+    await setFeatures({ inventory: true });
+    const first = (await ok('GET', `/t/stock?outlet=${o1.id}`, null, U)).gap;
+    assert.ok(first && first.from >= t0 - 1000 && first.to >= first.from, JSON.stringify(first));
+    await setFeatures({ inventory: false });
+    await setFeatures({ inventory: true });
+    const gap = (await ok('GET', `/t/stock?outlet=${o1.id}`, null, U)).gap;
+    assert.equal(gap.from, first.from, 'jeda berulang digabung dari awal');
+    assert.ok(gap.to >= first.to);
+    await ok('POST', '/t/stock/gap/dismiss', {}, U);
+    assert.equal((await ok('GET', `/t/stock?outlet=${o1.id}`, null, U)).gap, null);
+});
+await t('N7 asisten AI dimatikan per usaha → ditolak dengan pesan usaha (akun & tablet)', async () => {
+    await withFeatures({ ai: false }, async () => {
+        const r = await call('POST', '/assist', { question: 'cara split bill' }, U);
+        assert.equal(r.status, 403); assert.equal(r.data.code, 'ai_disabled'); assert.match(r.data.error, /usaha Anda/);
+        const r2 = await call('POST', '/assist', { question: 'cara split bill' }, K1);
+        assert.equal(r2.status, 403, 'tablet juga ditolak');
+    });
+    // Setelah diaktifkan lagi lolos pemeriksaan usaha (lokal tanpa API key → 'belum diaktifkan', bukan 'tidak aktif untuk usaha')
+    const r = await fetch(BASE + '/api/assist', { method: 'POST', headers: { 'content-type': 'application/json', ...U }, body: JSON.stringify({ question: 'cara split bill' }) }).then(x => x.json());
+    assert.notEqual(r.error, 'Asisten AI tidak aktif untuk usaha Anda');
+});
+await t('N8 input superadmin aneh: tenant tidak ada, body rusak, nilai bukan boolean, kunci asing, tanpa perubahan', async () => {
+    assert.equal((await call('PUT', '/admin/tenants/99999999/features', { features: { kds: false } }, A)).status, 404);
+    assert.equal((await call('PUT', `/admin/tenants/${reg.tenant.id}/features`, null, A, 'bukan json')).status, 400);
+    const logs = async () => (await ok('GET', `/admin/tenants/${reg.tenant.id}`, null, A)).logs.filter(l => l.action === 'features').length;
+    const n = await logs();
+    const r = await ok('PUT', `/admin/tenants/${reg.tenant.id}/features`, { features: JSON.parse('{"kds":"false","tables":0,"hacker":false,"__proto__":{"kds":false}}') }, A);
+    assert.ok(Object.values(r.features).every(Boolean), 'nilai bukan boolean diabaikan: ' + JSON.stringify(r.features));
+    await ok('PUT', `/admin/tenants/${reg.tenant.id}/features`, { features: { kds: true } }, A);
+    await ok('PUT', `/admin/tenants/${reg.tenant.id}/features`, {}, A);
+    assert.equal(await logs(), n, 'tanpa perubahan → tidak ada catatan riwayat');
+});
+await t('N9 cermin fitur di panel menyimpang → diselaraskan dari tenant saat statistik diperbarui', async () => {
+    if (!/localhost|127\.0\.0\.1/.test(BASE)) return;
+    await setFeatures({ kds: false });
+    const { execSync } = await import('node:child_process');
+    execSync(`npx wrangler d1 execute rasapos-core --local --command "UPDATE tenants SET features = NULL WHERE id = ${reg.tenant.id}"`, { stdio: 'ignore' });
+    assert.equal((await ok('GET', `/admin/tenants/${reg.tenant.id}`, null, A)).tenant.features.kds, true, 'panel menyimpang (simulasi)');
+    await ok('POST', `/admin/tenants/${reg.tenant.id}/refresh-stats`, {}, A);
+    assert.equal((await ok('GET', `/admin/tenants/${reg.tenant.id}`, null, A)).tenant.features.kds, false, 'panel kembali sesuai tenant');
+    await setFeatures({ kds: true });
+});
+await t('N10 semua fitur mati sekaligus: alur kasir dasar tetap lengkap (buka → kirim → diskon manual → bayar → refund)', async () => {
+    await withFeatures({ kds: false, tables: false, inventory: false, marketing: false, ai: false }, async () => {
+        const { id } = await orderWith(K1, d1, [item(mNasi, { qty: 2 }), item(mAir, { qty: 2 })], { channel: 'dine_in', guests: 3 });
+        expectOk(await one(K1, op('order.send', id, {})));
+        const d = expectOk(await one(K1, op('order.discount', id, { discount: { type: 'percent', value: 5 } })));
+        expectOk(await one(K1, op('order.pay', id, { payments: [{ method: 'cash', amount: Money.cashDue(d.order.totals.total, 100) }] })));
+        expectOk(await one(M1, op('order.refund', id, { reason: 'uji semua fitur mati' })));
+        assert.equal((await getOrder(id)).status, 'refunded');
+        const boot = await ok('GET', `/t/bootstrap?outlet=${o1.id}`, null, K1);
+        assert.deepEqual(boot.features, { kds: false, tables: false, inventory: false, marketing: false, ai: false });
+    });
+});
+
+// =====================================================================================
 // L. UJI ACAK (FUZZ) + KONSISTENSI LAPORAN
 // =====================================================================================
 const fuzzOrders = [];

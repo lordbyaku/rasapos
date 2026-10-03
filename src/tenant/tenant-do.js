@@ -132,7 +132,10 @@ export class TenantDO extends DurableObject {
         if (!tenantId) return;
         const online = this.ctx.getWebSockets().length;
         const stmt = this.env.CORE.prepare('INSERT OR REPLACE INTO tenant_stats (tenant_id, date, outlets, trx, sales, devices_online, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        await this.env.CORE.batch(dailyStats(this).map(s => stmt.bind(tenantId, s.date, s.outlets, s.trx, s.sales, online, Date.now())));
+        // Fitur: DO adalah sumber kebenaran; cermin di D1 (panel superadmin) diselaraskan ulang
+        const f = this.db.getMeta('features');
+        const featStmt = this.env.CORE.prepare('UPDATE tenants SET features = ? WHERE id = ?').bind(f && Object.keys(f).length ? JSON.stringify(f) : null, tenantId);
+        await this.env.CORE.batch([...dailyStats(this).map(s => stmt.bind(tenantId, s.date, s.outlets, s.trx, s.sales, online, Date.now())), featStmt]);
     }
 
     async alarm() {

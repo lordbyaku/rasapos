@@ -18,7 +18,15 @@ export function registerInventory(router) {
         requireOutlet(a, outlet);
         const rows = t.db.all(`SELECT i.*, COALESCE(s.qty, 0) AS qty FROM ingredients i
             LEFT JOIN stock s ON s.ingredient_id = i.id AND s.outlet_id = ? WHERE i.is_active = 1 ORDER BY i.name`, outlet);
-        return { items: rows.map(r => ({ ...r, low: r.min_stock > 0 && r.qty <= r.min_stock, value: Math.round(r.qty * r.cost) })) };
+        return { items: rows.map(r => ({ ...r, low: r.min_stock > 0 && r.qty <= r.min_stock, value: Math.round(r.qty * r.cost) })), gap: t.db.getMeta('inventory_gap') };
+    });
+
+    // Tutup pengingat "stok tidak dipotong selama inventori nonaktif" (setelah stock opname)
+    router.on('POST', '/stock/gap/dismiss', (t, req, a) => {
+        requireFeature(t, 'inventory');
+        requirePerm(a, 'inventory');
+        t.db.exec("DELETE FROM meta WHERE key = 'inventory_gap'");
+        return { ok: true };
     });
 
     router.on('GET', '/stock/moves', (t, req, a, p, url) => {

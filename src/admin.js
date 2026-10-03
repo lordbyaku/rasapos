@@ -1,5 +1,5 @@
 // Panel superadmin: kelola tenant, paket & masa aktif (pengganti WEB APP MANAGEMENT).
-import { Router, json, readJson, bad, notFound } from './lib/http.js';
+import { Router, json, readJson, bad, notFound, HttpError } from './lib/http.js';
 import { hashSecret, randomToken } from './lib/crypto.js';
 import { licenseOf } from './license.js';
 import { addDays } from './lib/time.js';
@@ -93,10 +93,16 @@ export const adminRouter = new Router()
         const stored = Object.fromEntries(F.KEYS.filter(k => !next[k]).map(k => [k, false]));
         // DO dulu (penegak aturan), baru D1 (cermin untuk panel)
         await callDO(tenantStub(env, t.do_key), 'POST', '/internal/features', { features: stored }, { kind: 'system', tid: t.id, dk: t.do_key });
-        await env.CORE.batch([
-            env.CORE.prepare('UPDATE tenants SET features = ? WHERE id = ?').bind(Object.keys(stored).length ? JSON.stringify(stored) : null, t.id),
-            env.CORE.prepare('INSERT INTO subscription_logs (tenant_id, action, detail, by_user, created_at) VALUES (?, ?, ?, ?, ?)').bind(t.id, 'features', 'Fitur: ' + changes.join(', '), a.user_id, Date.now())
-        ]);
+        try {
+            await env.CORE.batch([
+                env.CORE.prepare('UPDATE tenants SET features = ? WHERE id = ?').bind(Object.keys(stored).length ? JSON.stringify(stored) : null, t.id),
+                env.CORE.prepare('INSERT INTO subscription_logs (tenant_id, action, detail, by_user, created_at) VALUES (?, ?, ?, ?, ?)').bind(t.id, 'features', 'Fitur: ' + changes.join(', '), a.user_id, Date.now())
+            ]);
+        } catch (e) {
+            // Sudah berlaku di tenant; hanya catatan panel yang gagal (diselaraskan ulang otomatis tiap malam)
+            console.error('features D1', e);
+            throw new HttpError(500, 'Fitur sudah berlaku di tenant, tetapi gagal dicatat di panel. Simpan ulang untuk menyelaraskan.', 'features_log_failed');
+        }
         return json({ features: next });
     })
     .on('POST', '/tenants/:id/refresh-stats', async (req, env, a, p) => {

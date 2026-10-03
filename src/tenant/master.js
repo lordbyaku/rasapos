@@ -381,8 +381,20 @@ export function registerMaster(router) {
     }, { internal: true });
 
     router.on('POST', '/internal/features', async (t, req) => {
+        const before = features(t);
         t.db.setMeta('features', globalThis.Features.sanitize((await req.json()).features));
-        return { features: features(t) };
+        const after = features(t);
+        // Selama inventori nonaktif penjualan tidak memotong stok → ingatkan stock opname saat diaktifkan lagi
+        if (before.inventory && !after.inventory) t.db.setMeta('inventory_paused_at', now());
+        if (!before.inventory && after.inventory) {
+            const from = t.db.getMeta('inventory_paused_at');
+            if (from) {
+                const prev = t.db.getMeta('inventory_gap');
+                t.db.setMeta('inventory_gap', { from: prev ? prev.from : from, to: now() });
+                t.db.exec("DELETE FROM meta WHERE key = 'inventory_paused_at'");
+            }
+        }
+        return { features: after };
     }, { internal: true });
 
     // Meta back office

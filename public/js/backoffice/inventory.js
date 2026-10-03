@@ -26,11 +26,19 @@ BO.page('inventory', {
         $$('[data-mv]').forEach(b => b.onclick = () => this.move(b.dataset.mv));
         const low = d.items.filter(i => i.low).length;
         const value = d.items.reduce((s, i) => s + Math.max(0, i.value), 0);
-        body.innerHTML = `<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">${BO.kpi('Jenis bahan', d.items.length, '', 'fa-boxes-stacked')}${BO.kpi('Nilai stok', rp(value), 'berdasarkan harga rata-rata', 'fa-sack-dollar', 'text-stone-500')}${BO.kpi('Stok menipis', low, low ? 'perlu dibeli' : 'aman', 'fa-triangle-exclamation', low ? 'text-red-600' : 'text-emerald-600')}${BO.kpi('Stok minus', d.items.filter(i => i.qty < 0).length, 'cek resep / lakukan opname', 'fa-circle-minus', 'text-stone-500')}</div>
+        const gap = d.gap ? `<div class="mb-4 p-4 rounded-xl bg-amber-50 text-amber-900 text-sm flex flex-wrap items-center gap-3"><i class="fas fa-triangle-exclamation text-amber-500 text-lg"></i>
+            <div class="flex-1 min-w-[240px]"><b>Stok perlu dicek ulang.</b> Fitur inventori sempat nonaktif ${fmtDateTime(d.gap.from)} – ${fmtDateTime(d.gap.to)}; penjualan pada periode itu tidak memotong stok. Lakukan <b>Stock opname</b> di setiap outlet.</div>
+            <button class="btn-light !py-1.5 text-xs" id="gap-ok"><i class="fas fa-check"></i>Sudah opname</button></div>` : '';
+        body.innerHTML = gap + `<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">${BO.kpi('Jenis bahan', d.items.length, '', 'fa-boxes-stacked')}${BO.kpi('Nilai stok', rp(value), 'berdasarkan harga rata-rata', 'fa-sack-dollar', 'text-stone-500')}${BO.kpi('Stok menipis', low, low ? 'perlu dibeli' : 'aman', 'fa-triangle-exclamation', low ? 'text-red-600' : 'text-emerald-600')}${BO.kpi('Stok minus', d.items.filter(i => i.qty < 0).length, 'cek resep / lakukan opname', 'fa-circle-minus', 'text-stone-500')}</div>
             ${d.items.length ? `<div class="card overflow-hidden"><div class="overflow-x-auto"><table class="tbl whitespace-nowrap"><thead><tr><th>Bahan</th><th class="text-right">Stok</th><th>Satuan</th><th class="text-right">Minimum</th><th class="text-right">Harga rata-rata</th><th class="text-right">Nilai</th><th>Status</th></tr></thead><tbody>
             ${d.items.map(i => `<tr><td><b>${esc(i.name)}</b></td><td class="text-right font-semibold ${i.qty < 0 ? 'text-red-600' : ''}">${num(i.qty)}</td><td>${esc(i.unit)}</td><td class="text-right text-stone-500">${num(i.min_stock)}</td>
                 <td class="text-right">${rp(i.cost)}</td><td class="text-right">${rp(i.value)}</td><td>${i.qty < 0 ? '<span class="badge bg-red-50 text-red-600">Minus</span>' : i.low ? '<span class="badge bg-amber-50 text-amber-700">Menipis</span>' : '<span class="badge bg-emerald-50 text-emerald-700">Aman</span>'}</td></tr>`).join('')}</tbody></table></div></div>`
             : BO.empty('fa-boxes-stacked', 'Belum ada bahan baku. Tambahkan di tab "Bahan Baku", lalu atur resep di Menu.')}`;
+        const gapOk = $('#gap-ok');
+        if (gapOk) gapOk.onclick = async () => {
+            if (!(await confirmDialog('Tandai stok sudah dicek ulang?', 'Pengingat ini hilang untuk semua outlet.'))) return;
+            try { await API.post('/t/stock/gap/dismiss'); this.load(); } catch (e) { errorDialog(e); }
+        };
     },
 
     move(type) {
