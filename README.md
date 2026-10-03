@@ -38,6 +38,10 @@ npm test
 ```bash
 npm run smoke
 ```
+Simulasi menyeluruh (82 skenario + fuzz, hanya ke server lokal):
+```bash
+npm run scenarios
+```
 
 ## Deploy ke Cloudflare
 1. `npx wrangler login`
@@ -59,3 +63,9 @@ Transaksi, kirim dapur, bayar, dan shift tetap bisa saat internet putus; data di
 
 ## Kuota Cloudflare Free (perkiraan)
 100 rb baris tulis/hari ≈ ±24 outlet aktif. Upgrade **Workers Paid ($5/bln)** sebelum ±15 outlet.
+
+## Update aplikasi
+Push ke branch `main` → Cloudflare otomatis build & deploy. **Jika ada file baru di `migrations/`, jalankan dulu sebelum push:**
+```bash
+npm run db:migrate:remote
+```

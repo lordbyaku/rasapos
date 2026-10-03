@@ -58,7 +58,8 @@
         const nonCash = payments.filter(p => p.type !== 'cash').reduce((s, p) => s + p.amount, 0);
         const remainingForCash = Math.max(0, total - nonCash);
         let rounding = 0;
-        if (cashPaid > 0 && step > 0 && remainingForCash > 0) rounding = Math.round(remainingForCash / step) * step - remainingForCash;
+        const hasCash = payments.some(p => p.type === 'cash');
+        if (hasCash && step > 0 && remainingForCash > 0) rounding = Math.round(remainingForCash / step) * step - remainingForCash;
         const due = total + rounding;
         const paid = cashPaid + nonCash;
         const change = Math.max(0, paid - due);

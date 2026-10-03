@@ -37,7 +37,7 @@ const publicUser = u => ({ id: u.id, email: u.email, name: u.name, role: u.role,
 async function issueUserTokens(env, user, tenant) {
     const lic = tenant ? licenseOf(tenant, env) : null;
     const access = await signJwt({
-        typ: 'user', sub: user.id, tid: user.tenant_id, role: user.role, name: user.name,
+        typ: 'user', sub: user.id, tid: user.tenant_id, dk: tenant ? tenant.do_key : null, role: user.role, name: user.name,
         oids: user.outlet_ids ? JSON.parse(user.outlet_ids) : null,
         sa: isSuperadmin(env, user.email) ? 1 : 0, lic: lic ? licClaim(lic) : null
     }, env.JWT_SECRET, ACCESS_TTL);
@@ -54,7 +54,7 @@ async function issueUserTokens(env, user, tenant) {
 export async function issueDeviceToken(env, device, tenant) {
     const lic = licenseOf(tenant, env);
     const token = await signJwt({
-        typ: 'device', sub: device.id, tid: device.tenant_id, oid: device.outlet_id,
+        typ: 'device', sub: device.id, tid: device.tenant_id, dk: tenant.do_key, oid: device.outlet_id,
         dtype: device.type, code: device.code, name: device.name, lic: licClaim(lic)
     }, env.JWT_SECRET, DEVICE_TTL);
     return { access_token: token, expires_in: DEVICE_TTL, license: lic };
@@ -97,8 +97,9 @@ export const authRouter = new Router()
 
         const now = Date.now();
         const trialEnd = now + Number(env.TRIAL_DAYS || 14) * DAY;
-        const t = await env.CORE.prepare('INSERT INTO tenants (name, phone, status, trial_ends_at, outlet_packs, created_at) VALUES (?, ?, \'trial\', ?, 0, ?) RETURNING *')
-            .bind(data.business_name, data.phone, trialEnd, now).first();
+        // Kunci penyimpanan acak: data tenant tidak pernah tertukar walau ID D1 terulang
+        const t = await env.CORE.prepare('INSERT INTO tenants (name, phone, status, trial_ends_at, outlet_packs, created_at, do_key) VALUES (?, ?, \'trial\', ?, 0, ?, ?) RETURNING *')
+            .bind(data.business_name, data.phone, trialEnd, now, 'tenant:' + randomToken(18)).first();
         const hash = await hashSecret(data.password, iterations(env));
         const user = await env.CORE.prepare('INSERT INTO users (email, password_hash, name, tenant_id, role, created_at, last_login_at) VALUES (?, ?, ?, ?, \'owner\', ?, ?) RETURNING *')
             .bind(data.email.toLowerCase(), hash, data.owner_name, t.id, now, now).first();
@@ -106,7 +107,7 @@ export const authRouter = new Router()
         await env.CORE.prepare('INSERT INTO subscription_logs (tenant_id, action, detail, created_at) VALUES (?, \'register\', ?, ?)')
             .bind(t.id, `Trial sampai ${new Date(trialEnd).toISOString().slice(0, 10)}`, now).run();
 
-        await callDO(tenantStub(env, t.id), 'POST', '/internal/init', { tenant_id: t.id, business_name: data.business_name, outlet_name: data.outlet_name, phone: data.phone }, { kind: 'system', tid: t.id });
+        await callDO(tenantStub(env, t.do_key), 'POST', '/internal/init', { tenant_id: t.id, business_name: data.business_name, outlet_name: data.outlet_name, phone: data.phone }, { kind: 'system', tid: t.id, dk: t.do_key });
         return json(await issueUserTokens(env, user, t), 201);
     })
 

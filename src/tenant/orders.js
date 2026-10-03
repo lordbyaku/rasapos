@@ -562,7 +562,8 @@ async function resolveApproval(t, a, op, order) {
     const ap = op.payload && op.payload.approval;
     if (op.offline && op.payload && op.payload.approved_by) {
         const s = t.db.one('SELECT id, name, role, permissions FROM staff WHERE id = ?', Number(op.payload.approved_by));
-        if (!s) throw forbidden('Persetujuan tidak valid');
+        if (!s) throw OpError('approval_invalid', 'Persetujuan offline tidak valid: manager tidak dikenal');
+        if (!staffPerms(s).includes(perm)) throw OpError('approval_invalid', `${s.name} tidak berwenang menyetujui tindakan ini`);
         return { id: s.id, name: s.name, offline: true };
     }
     if (!ap || !ap.staff_id || !ap.pin) throw new HttpError(403, 'Butuh persetujuan manager (PIN)', 'approval_required', { perm });

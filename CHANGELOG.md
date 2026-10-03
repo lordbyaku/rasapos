@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.1] — 2026-10-03
+
+Hasil simulasi menyeluruh (`npm run scenarios`, 82 skenario: harga, modifier, void, diskon, promo, pembayaran,
+refund, meja, offline, hak akses, input aneh, operasi bersamaan, fuzz 120 order + cek konsistensi laporan & kas).
+
+### Keamanan
+- **Kunci penyimpanan acak per tenant** (`tenants.do_key`, migrasi `0002`). Sebelumnya data tenant dialamatkan
+  dengan nomor urut ID; jika database inti dibuat ulang, tenant baru bisa mendapat penyimpanan tenant lama.
+  Tenant lama tetap memakai kunci `tenant:<id>`. Durable Object kini menolak konteks tenant yang tidak cocok
+  dan menolak inisialisasi ulang oleh tenant lain.
+
+### Perbaikan
+- Request yang ditolak Durable Object sebelum body dibaca membuat request **berikutnya** gagal 500
+  ("Can't read from request stream"). Body kini dibaca penuh di Worker sebelum diteruskan.
+- Sisa tagihan < setengah satuan pembulatan setelah non-tunai (mis. QRIS 103.910 dari 103.950) tidak bisa
+  diselesaikan karena "uang pas" tunai Rp 0 ditolak. Baris tunai Rp 0 kini dihitung untuk pembulatan.
+- Approval offline dengan manager tidak dikenal/tidak berwenang membuat operasi tersangkut di antrean tablet;
+  kini ditolak sebagai aturan bisnis (tersimpan, tidak diulang terus).
+- Diskon persen > 100% ditolak.
+- Jumlah item harus bilangan bulat 1–9999 (teks/pecahan sebelumnya diam-diam jadi 1).
+- Nominal pembayaran negatif/bukan angka ditolak dengan pesan jelas (sebelumnya diam-diam dibuang).
+- Superadmin lokal dipisah lewat `.dev.vars` (`SUPERADMIN_EMAILS`) agar tidak bentrok dengan produksi.
+
 ## [1.0.0] — 2026-10-02
 
 Rilis pertama RasaPOS Cloud (Cloudflare Full). Plan: [PLAN-CLOUDFLARE.md](PLAN-CLOUDFLARE.md).

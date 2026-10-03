@@ -2,3 +2,5 @@
 JWT_SECRET=ganti-dengan-string-acak-minimal-32-karakter
 # Opsional: email reset password via Resend
 RESEND_API_KEY=
+# Superadmin khusus lokal (menimpa nilai di wrangler.jsonc)
+SUPERADMIN_EMAILS=admin@rasapos.local

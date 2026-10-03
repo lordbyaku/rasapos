@@ -24,8 +24,9 @@
     const int = (v, d = 0) => (Number.isFinite(+v) ? Math.round(+v) : d);
 
     function sanitizeItem(it) {
-        const qty = int(it.qty, 1);
-        if (!it.id || !it.name || qty <= 0) throw new OpError('invalid_item', 'Data item tidak valid');
+        const qty = Number(it.qty);
+        if (!it.id || !String(it.name || '').trim() || !Number.isInteger(qty) || qty <= 0 || qty > 9999) throw new OpError('invalid_item', 'Data item tidak valid (nama/jumlah)');
+        if (it.price !== undefined && !Number.isFinite(Number(it.price))) throw new OpError('invalid_item', 'Harga item tidak valid');
         return {
             id: String(it.id),
             menu_id: it.menu_id || null,
@@ -83,7 +84,8 @@
             const it = findItem(o, p.item_id);
             if (!['new', 'held'].includes(it.status)) throw new OpError('item_sent', 'Item sudah dikirim ke dapur — gunakan void');
             if (p.qty !== undefined) {
-                const q = int(p.qty);
+                const q = Number(p.qty);
+                if (!Number.isInteger(q) || q < 0 || q > 9999) throw new OpError('invalid', 'Jumlah tidak valid');
                 if (q <= 0) { o.items = o.items.filter(i => i.id !== it.id); return o; }
                 it.qty = q;
             }
@@ -115,6 +117,7 @@
             const d = p.discount;
             if (!d || !(+d.value > 0)) { o.discount = null; return o; }
             if (!['percent', 'amount'].includes(d.type)) throw new OpError('invalid', 'Jenis diskon tidak valid');
+            if (d.type === 'percent' && Number(d.value) > 100) throw new OpError('invalid', 'Diskon persen maksimal 100%');
             o.discount = { type: d.type, value: int(d.value), name: String(d.name || 'Diskon').slice(0, 60), promo_id: d.promo_id || null, approved_by: d.approved_by || null };
             return o;
         },
@@ -160,9 +163,16 @@
             const items = o.items.filter(i => i.status !== 'void');
             if (!items.length) throw new OpError('empty', 'Order kosong');
             recalc(o, ctx);
-            const payments = (p.payments || []).map(x => ({ id: x.id || null, method: String(x.method), name: String(x.name || x.method), type: x.type === 'cash' ? 'cash' : 'noncash', amount: Math.max(0, int(x.amount)), ref: String(x.ref || '').slice(0, 60) })).filter(x => x.amount > 0);
-            if (!payments.length && o.totals.total > 0) throw new OpError('no_payment', 'Belum ada pembayaran');
-            const s = Money.settle(o.totals.total, payments, ctx.outlet && ctx.outlet.cash_rounding);
+            const lines = (p.payments || []).map(x => {
+                const amount = Number(x.amount);
+                if (!Number.isFinite(amount) || amount < 0) throw new OpError('payment_invalid', 'Nominal pembayaran tidak valid');
+                return { id: x.id || null, method: String(x.method), name: String(x.name || x.method), type: x.type === 'cash' ? 'cash' : 'noncash', amount: Math.round(amount), ref: String(x.ref || '').slice(0, 60) };
+            });
+            // Baris tunai Rp 0 dipertahankan untuk perhitungan (sisa kecil dibulatkan ke 0), tapi tidak disimpan
+            const considered = lines.filter(x => x.amount > 0 || x.type === 'cash');
+            const payments = lines.filter(x => x.amount > 0);
+            if (!considered.length && o.totals.total > 0) throw new OpError('no_payment', 'Belum ada pembayaran');
+            const s = Money.settle(o.totals.total, considered, ctx.outlet && ctx.outlet.cash_rounding);
             if (!s.ok) throw new OpError('underpaid', 'Pembayaran kurang atau tidak valid');
             // item yang belum dikirim dianggap terkirim (langsung bayar)
             for (const it of o.items) if (it.status === 'new' || it.status === 'held') { it.status = 'sent'; it.sent_at = ctx.at; it.auto_sent = true; }

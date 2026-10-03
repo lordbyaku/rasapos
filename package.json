@@ -1,6 +1,6 @@
 {
   "name": "rasapos-cloud",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "POS Food & Beverage multi-outlet di Cloudflare (Workers + Durable Objects + D1)",
   "type": "module",
@@ -14,6 +14,7 @@
     "test": "node --test \"test/**/*.test.js\"",
     "smoke": "node scripts/smoke.mjs",
     "seed": "node scripts/seed.mjs",
+    "scenarios": "node scripts/scenarios.mjs",
     "build": "npm run setup && node scripts/bump-version.mjs",
     "deploy": "npm run build && npm run db:migrate:remote && wrangler deploy"
   },

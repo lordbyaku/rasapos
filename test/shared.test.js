@@ -72,3 +72,16 @@ test('order-ops: alur buka → tambah → kirim → void → bayar', () => {
     assert.equal(o.change, 24900);
     assert.throws(() => OrderOps.apply(o, { type: 'order.add_items', payload: { items: [item('x', 1000)] } }, ctx), /dibayar/);
 });
+
+test('aturan baru: qty ketat, diskon persen maks 100, nominal negatif, tunai Rp 0 untuk sisa kecil', () => {
+    const ctx = { outlet, at: 1, staff_id: 's', device_id: 'd' };
+    let o = OrderOps.apply(null, { type: 'order.open', payload: { id: 'x', order_no: 'X', type: 'take_away' } }, ctx);
+    for (const qty of [0, -1, 'abc', 1.5]) assert.throws(() => OrderOps.apply(o, { type: 'order.add_items', payload: { items: [item('a', 1000, qty)] } }, ctx), /tidak valid/);
+    o = OrderOps.apply(o, { type: 'order.add_items', payload: { items: [item('a', 94500)] } }, ctx);
+    assert.throws(() => OrderOps.apply(o, { type: 'order.discount', payload: { discount: { type: 'percent', value: 150 } } }, ctx), /100/);
+    assert.throws(() => OrderOps.apply(o, { type: 'order.pay', payload: { payments: [{ method: 'qris', type: 'noncash', amount: -5 }] } }, ctx), /tidak valid/);
+    const total = o.totals.total;
+    const paid = OrderOps.apply(o, { type: 'order.pay', payload: { payments: [{ method: 'qris', type: 'noncash', amount: total - 40 }, { method: 'cash', type: 'cash', amount: 0 }] } }, ctx);
+    assert.equal(paid.rounding, -40);
+    assert.equal(paid.payments.length, 1);
+});

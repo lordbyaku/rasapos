@@ -33,7 +33,12 @@ function hasCol(t, table, col) {
 
 // ---------------------------------------------------------------- inisialisasi tenant
 export function initTenant(t, body) {
-    if (t.db.getMeta('tenant_id')) return { ok: true, already: true };
+    const existing = t.db.getMeta('tenant_id');
+    if (existing) {
+        // Penyimpanan ini sudah milik tenant lain: jangan pernah dipakai ulang
+        if (Number(existing) !== Number(body.tenant_id)) throw new HttpError(409, 'Penyimpanan tenant bentrok', 'tenant_conflict');
+        return { ok: true, already: true };
+    }
     t.ctx.storage.transactionSync(() => {
         t.db.setMeta('tenant_id', body.tenant_id);
         t.db.setMeta('tenant_name', body.business_name);

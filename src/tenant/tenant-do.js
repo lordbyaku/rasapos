@@ -49,6 +49,9 @@ export class TenantDO extends DurableObject {
 
             if (url.pathname === '/internal/init') return json(initTenant(this, await request.json()));
 
+            // Pertahanan berlapis: konteks harus milik tenant pemilik penyimpanan ini
+            const owner = this.db.getMeta('tenant_id');
+            if (owner && a.tid && Number(owner) !== Number(a.tid)) throw forbidden('Akses tenant tidak valid');
             if (a.kind === 'device' && this.db.one('SELECT device_id FROM revoked_devices WHERE device_id = ?', a.device_id)) {
                 throw unauthorized('Perangkat ini sudah dicabut aksesnya oleh pemilik', 'device_revoked');
             }

@@ -3,7 +3,7 @@ import { Router, json, readJson, bad, notFound } from './lib/http.js';
 import { hashSecret, randomToken } from './lib/crypto.js';
 import { licenseOf } from './license.js';
 import { addDays } from './lib/time.js';
-import { tenantStub, callDO } from './do-client.js';
+import { tenantStub, callDO, doKeyOf } from './do-client.js';
 
 const DAY = 86400000;
 
@@ -79,7 +79,8 @@ export const adminRouter = new Router()
         return json({ tenant: { ...nt, license: licenseOf(nt, env) } });
     })
     .on('POST', '/tenants/:id/refresh-stats', async (req, env, a, p) => {
-        await callDO(tenantStub(env, Number(p.id)), 'POST', '/internal/push-stats', {}, { kind: 'system', tid: Number(p.id) });
+        const dk = await doKeyOf(env, p.id);
+        await callDO(tenantStub(env, dk), 'POST', '/internal/push-stats', {}, { kind: 'system', tid: Number(p.id), dk });
         return json({ ok: true });
     })
     .on('POST', '/users/:id/reset-password', async (req, env, a, p) => {

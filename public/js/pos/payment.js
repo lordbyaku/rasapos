@@ -71,7 +71,7 @@ const Payment = {
 
         const calc = () => {
             const all = [...lines];
-            if (Number(buf) > 0) all.push({ method, type: typeOf(method), amount: Number(buf) });
+            if (Number(buf) > 0 || (typeOf(method) === 'cash' && buf === '0')) all.push({ method, type: typeOf(method), amount: Number(buf) });
             return { all, s: Money.settle(total, all, step) };
         };
         const remainingFor = m => {

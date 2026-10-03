@@ -22,7 +22,7 @@ export const coreTenantRouter = new Router()
         });
         if (!inScope(a, d.outlet_id)) throw forbidden();
         // Pastikan outlet milik tenant & aktif
-        await callDO(tenantStub(env, a.tid), 'GET', `/internal/outlet/${d.outlet_id}`, null, { kind: 'system', tid: a.tid });
+        await callDO(tenantStub(env, a.dk), 'GET', `/internal/outlet/${d.outlet_id}`, null, { kind: 'system', tid: a.tid, dk: a.dk });
         let code;
         for (let i = 0; i < 5; i++) {
             code = randomDigits(6);
@@ -45,7 +45,7 @@ export const coreTenantRouter = new Router()
         const dev = await env.CORE.prepare('SELECT * FROM devices WHERE id = ? AND tenant_id = ?').bind(p.id, a.tid).first();
         if (!dev || !inScope(a, dev.outlet_id)) throw notFound('Perangkat tidak ditemukan');
         await env.CORE.prepare('UPDATE devices SET revoked_at = ? WHERE id = ?').bind(Date.now(), p.id).run();
-        await callDO(tenantStub(env, a.tid), 'POST', '/internal/revoke-device', { device_id: p.id }, { kind: 'system', tid: a.tid });
+        await callDO(tenantStub(env, a.dk), 'POST', '/internal/revoke-device', { device_id: p.id }, { kind: 'system', tid: a.tid, dk: a.dk });
         return json({ ok: true });
     })
 
@@ -104,6 +104,6 @@ export const coreTenantRouter = new Router()
         ownerOnly(a);
         const d = pick(await readJson(req), { name: { type: 'str', required: true, max: 80, label: 'Nama usaha' }, phone: { type: 'str', max: 30, default: '' } });
         await env.CORE.prepare('UPDATE tenants SET name = ?, phone = ? WHERE id = ?').bind(d.name, d.phone, a.tid).run();
-        await callDO(tenantStub(env, a.tid), 'POST', '/internal/tenant-name', { name: d.name }, { kind: 'system', tid: a.tid });
+        await callDO(tenantStub(env, a.dk), 'POST', '/internal/tenant-name', { name: d.name }, { kind: 'system', tid: a.tid, dk: a.dk });
         return json({ ok: true });
     });

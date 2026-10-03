@@ -7,7 +7,7 @@ import { verifyJwt } from './lib/jwt.js';
 import { authRouter, bearer } from './auth.js';
 import { adminRouter } from './admin.js';
 import { coreTenantRouter } from './core-tenant.js';
-import { forwardToDO, tenantStub } from './do-client.js';
+import { forwardToDO, doKeyOf } from './do-client.js';
 
 export { TenantDO } from './tenant/tenant-do.js';
 
@@ -17,10 +17,10 @@ async function authContext(env, token, staffToken) {
     const payload = await verifyJwt(token, env.JWT_SECRET);
     if (payload.typ === 'user') {
         if (!payload.tid) throw forbidden('Akun ini tidak terhubung ke usaha mana pun');
-        return { kind: 'user', tid: payload.tid, user_id: payload.sub, role: payload.role, name: payload.name, outlet_ids: payload.oids ?? null, sa: !!payload.sa, lic: payload.lic };
+        return { kind: 'user', tid: payload.tid, dk: payload.dk || 'tenant:' + payload.tid, user_id: payload.sub, role: payload.role, name: payload.name, outlet_ids: payload.oids ?? null, sa: !!payload.sa, lic: payload.lic };
     }
     if (payload.typ === 'device') {
-        const ctx = { kind: 'device', tid: payload.tid, device_id: payload.sub, device_type: payload.dtype, device_code: payload.code, device_name: payload.name, outlet_id: payload.oid, outlet_ids: [payload.oid], lic: payload.lic, staff: null };
+        const ctx = { kind: 'device', tid: payload.tid, dk: payload.dk || 'tenant:' + payload.tid, device_id: payload.sub, device_type: payload.dtype, device_code: payload.code, device_name: payload.name, outlet_id: payload.oid, outlet_ids: [payload.oid], lic: payload.lic, staff: null };
         if (staffToken) {
             const s = await verifyJwt(staffToken, env.JWT_SECRET, 'staff');
             if (s.tid !== ctx.tid || s.did !== ctx.device_id) throw unauthorized('Sesi staff tidak cocok dengan perangkat', 'staff_invalid');
@@ -53,7 +53,7 @@ async function handleApi(request, env, url) {
     // File publik (foto menu) — id acak, tanpa auth agar bisa dipakai di <img>
     const file = path.match(/^\/f\/(\d+)\/([\w-]+)$/);
     if (file && request.method === 'GET') {
-        return forwardToDO(env, request, `/files/${file[2]}`, { kind: 'public', tid: Number(file[1]) });
+        return forwardToDO(env, request, `/files/${file[2]}`, { kind: 'public', tid: Number(file[1]), dk: await doKeyOf(env, file[1]) });
     }
 
     // Realtime: token lewat query (browser tidak bisa set header WebSocket)
