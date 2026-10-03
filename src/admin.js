@@ -105,7 +105,8 @@ export const adminRouter = new Router()
         const body = await readJson(req, 10000);
         const key = String(body.key || '').trim();
         const label = String(body.label || '').trim().slice(0, 60) || 'Kunci';
-        if (!/^[\w-]{20,200}$/.test(key)) throw bad('Format API key tidak valid', 'key_invalid');
+        // format lama "AIza…" & format baru "AQ.…"
+        if (!/^[\w.-]{20,300}$/.test(key)) throw bad('Format API key tidak valid', 'key_invalid');
         const rows = (await env.CORE.prepare('SELECT key_enc FROM ai_keys').all()).results;
         if (rows.length >= MAX_KEYS) throw bad(`Maksimal ${MAX_KEYS} API key. Hapus salah satu dulu.`, 'key_limit');
         for (const r of rows) {

@@ -37,7 +37,7 @@ async function askGemini(env, question, history, hits) {
     const data = await generate(env, {
         systemInstruction: { parts: [{ text: SYSTEM }] },
         contents,
-        generationConfig: { temperature: 0.2, maxOutputTokens: 700 }
+        generationConfig: { temperature: 0.2, maxOutputTokens: 2048 }
     });
     const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
     if (!text) throw new HttpError(503, 'Asisten AI tidak memberi jawaban', 'ai_unavailable');

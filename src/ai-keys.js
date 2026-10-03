@@ -131,7 +131,7 @@ export async function generate(env, body) {
 export async function testKey(env, key) {
     const { model } = await getSettings(env);
     const t = Date.now();
-    const r = await post(key, model, { contents: [{ role: 'user', parts: [{ text: 'Balas satu kata: siap' }] }], generationConfig: { maxOutputTokens: 20 } }, 15000);
+    const r = await post(key, model, { contents: [{ role: 'user', parts: [{ text: 'Balas satu kata: siap' }] }], generationConfig: { maxOutputTokens: 256 } }, 15000);
     if (r.status === 200) return { ok: true, model, ms: Date.now() - t };
     const c = r.status === 0 ? { message: r.data.error.message } : classify(r.status, r.data);
     return { ok: false, model, status: r.status, error: c.message, cooldown: c.cooldown || 0 };

@@ -100,7 +100,7 @@ const AdminAI = {
         const r = await SwalBase.fire({
             title: 'Tambah API key Gemini',
             html: `<label class="label text-left">Nama (mis. akun Google pemiliknya)</label><input id="ak-label" class="input mb-3" maxlength="60" placeholder="Kunci ${this.data.keys.length + 1}">
-                   <label class="label text-left">API key</label><input id="ak-key" type="password" class="input font-mono" autocomplete="off" placeholder="AIza…">
+                   <label class="label text-left">API key</label><input id="ak-key" type="password" class="input font-mono" autocomplete="off" placeholder="AIza… atau AQ.…">
                    <p class="text-[11px] text-stone-500 text-left mt-2">Kunci langsung diuji ke Google sebelum disimpan.</p>`,
             showCancelButton: true, confirmButtonText: 'Uji & simpan', showLoaderOnConfirm: true,
             preConfirm: async () => {

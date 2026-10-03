@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1] — 2026-10-03
+
+### Perbaikan
+- API key Gemini format baru (`AQ.…`, mengandung titik) ditolak "Format API key tidak valid". Kini format lama `AIza…` dan baru `AQ.…` diterima.
+- Batas token jawaban AI dinaikkan (model Gemini 3 memakai sebagian token untuk "berpikir", jawaban bisa terpotong).
+
+
 ## [1.2.0] — 2026-10-03
 
 ### Baru
