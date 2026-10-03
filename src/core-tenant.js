@@ -5,6 +5,7 @@ import { pick, isEmail } from './lib/validate.js';
 import { licenseOf } from './license.js';
 import { getTenant } from './auth.js';
 import { tenantStub, callDO } from './do-client.js';
+import '../public/js/shared/features.js';
 
 const ownerOnly = a => { if (a.role !== 'owner') throw forbidden('Hanya pemilik usaha yang dapat melakukan ini'); };
 const inScope = (a, outletId) => a.outlet_ids === null || a.outlet_ids.includes(Number(outletId));
@@ -21,6 +22,10 @@ export const coreTenantRouter = new Router()
             name: { type: 'str', required: true, max: 40, label: 'Nama perangkat' }
         });
         if (!inScope(a, d.outlet_id)) throw forbidden();
+        if (d.type === 'kds') {
+            const t = await getTenant(env, a.tid);
+            if (!globalThis.Features.resolve(t && t.features).kds) throw forbidden('Fitur Layar Dapur (KDS) tidak aktif untuk usaha ini. Hubungi admin RasaPOS.', 'feature_disabled');
+        }
         // Pastikan outlet milik tenant & aktif
         await callDO(tenantStub(env, a.dk), 'GET', `/internal/outlet/${d.outlet_id}`, null, { kind: 'system', tid: a.tid, dk: a.dk });
         let code;

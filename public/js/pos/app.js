@@ -12,6 +12,8 @@ const POS = {
     get outlet() { return this.boot.outlet; },
     get device() { return Auth.device.device; },
     can(p) { return !!(this.staff && this.staff.perms.includes(p)); },
+    /** Fitur tenant aktif? (diatur superadmin; data lama tanpa `features` = semua aktif) */
+    has(key) { return !this.boot || !this.boot.features || this.boot.features[key] !== false; },
     get online() { return Sync.online && navigator.onLine; },
 
     // ---------------------------------------------------------------- start
@@ -61,6 +63,9 @@ const POS = {
             method: Object.fromEntries(b.payment_methods.map(m => [m.code, m]))
         };
         if (b.open_shift !== undefined && !this._shiftLocal) this.shift = b.open_shift;
+        const tablesTab = $('#nav-views [data-v="tables"]');
+        if (tablesTab) tablesTab.classList.toggle('hidden', !this.has('tables'));
+        if (this.view === 'tables' && !this.has('tables')) this.view = 'order';
     },
 
     async refreshBoot() {
@@ -317,6 +322,7 @@ const POS = {
     },
 
     setView(v) {
+        if (v === 'tables' && !this.has('tables')) v = 'orders';
         this.view = v;
         $$('#nav-views [data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === v));
         for (const x of ['order', 'tables', 'orders']) $('#view-' + x).classList.toggle('hidden', x !== v);
@@ -472,7 +478,7 @@ const POS = {
                     <div class="grid grid-cols-2 gap-3 mt-3">
                         <div><label class="label">Lebar kertas</label><select id="pr-width" class="input"><option value="58" ${s.width === 58 ? 'selected' : ''}>58 mm</option><option value="80" ${s.width === 80 ? 'selected' : ''}>80 mm</option></select></div>
                         <div><label class="label">Tiket dapur</label><select id="pr-kitchen" class="input">
-                            <option value="none" ${s.kitchen === 'none' ? 'selected' : ''}>Tidak dicetak (pakai KDS)</option>
+                            <option value="none" ${s.kitchen === 'none' ? 'selected' : ''}>${this.has('kds') ? 'Tidak dicetak (pakai KDS)' : 'Tidak dicetak'}</option>
                             <option value="own" ${s.kitchen === 'own' ? 'selected' : ''}>Cetak saat kirim dari perangkat ini</option>
                             <option value="all" ${s.kitchen === 'all' ? 'selected' : ''}>Cetak semua tiket outlet (printer dapur)</option></select></div>
                         <label class="flex items-center gap-2"><input type="checkbox" id="pr-auto" ${s.auto !== false ? 'checked' : ''} class="accent-orange-500 w-4 h-4">Cetak struk otomatis setelah bayar (printer thermal)</label>

@@ -14,6 +14,11 @@ const BO = {
     channelName(code) { const c = this.meta && this.meta.channels.find(x => x.code === code); return c ? c.name : code; },
 
     page(name, def) { this.pages[name] = def; },
+    /** Fitur tenant aktif? (diatur superadmin) */
+    has(key) { return !this.meta || !this.meta.features || this.meta.features[key] !== false; },
+    featureOff(view, label) {
+        view.innerHTML = `<div class="card p-10 text-center max-w-lg mx-auto"><i class="fas fa-toggle-off text-4xl text-stone-300"></i><h3 class="font-bold mt-3">Fitur ${esc(label)} tidak aktif</h3><p class="text-sm text-stone-500 mt-1">Fitur ini dinonaktifkan untuk usaha Anda. Hubungi admin RasaPOS jika ingin memakainya.</p></div>`;
+    },
 
     // ---------------------------------------------------------------- start
     async start() {
@@ -45,9 +50,9 @@ const BO = {
         const nav = [
             ['UTAMA'], ['dashboard', 'fa-chart-line', 'Dashboard'], ['transactions', 'fa-receipt', 'Transaksi'], ['reports', 'fa-file-lines', 'Laporan'],
             ['KATALOG'], ['menu', 'fa-utensils', 'Menu & Harga'], ['marketing', 'fa-tags', 'Promo & Pelanggan'], ['inventory', 'fa-boxes-stacked', 'Inventori'],
-            ['OUTLET'], ['outlets', 'fa-store', 'Outlet & Meja'], ['devices', 'fa-tablet-screen-button', 'Perangkat'], ['staff', 'fa-users', 'Staff & Akses'],
+            ['OUTLET'], ['outlets', 'fa-store', this.has('tables') ? 'Outlet & Meja' : 'Outlet'], ['devices', 'fa-tablet-screen-button', 'Perangkat'], ['staff', 'fa-users', 'Staff & Akses'],
             ['LAINNYA'], ['settings', 'fa-gear', 'Pengaturan'], ['tutorial', 'fa-graduation-cap', 'Panduan & Training', '/tutorial.html']
-        ];
+        ].filter(n => !this.PAGE_FEATURE[n[0]] || this.has(this.PAGE_FEATURE[n[0]][0]));
         if (u.superadmin) nav.push(['admin', 'fa-user-shield', 'Superadmin', '/admin.html']);
         $('#nav').innerHTML = nav.map(n => n.length === 1
             ? `<div class="px-3 pt-4 pb-1 text-[10px] uppercase tracking-wider text-stone-500">${n[0]}</div>`
@@ -77,6 +82,8 @@ const BO = {
     },
 
     // ---------------------------------------------------------------- router
+    PAGE_FEATURE: { marketing: ['marketing', 'Promo & Pelanggan'], inventory: ['inventory', 'Inventori'] },
+
     async route() {
         const name = (location.hash.slice(1) || 'dashboard').split('/')[0];
         const page = this.pages[name] || this.pages.dashboard;
@@ -87,6 +94,8 @@ const BO = {
         $('#header-tools').innerHTML = '';
         const view = $('#view');
         view.innerHTML = '<div class="py-20 text-center text-stone-400"><i class="fas fa-spinner fa-spin text-2xl"></i></div>';
+        const pf = this.PAGE_FEATURE[name];
+        if (pf && !this.has(pf[0])) return this.featureOff(view, pf[1]);
         try { await page.render(view); }
         catch (e) { view.innerHTML = `<div class="card p-8 text-center text-red-600">${esc(e.message)}</div>`; console.error(e); }
     },

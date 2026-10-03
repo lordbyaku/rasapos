@@ -1,4 +1,5 @@
 import { HttpError, forbidden, bad } from '../lib/http.js';
+import '../../public/js/shared/features.js';
 import { ROLE_PERMS } from './schema.js';
 
 /** Pembungkus SQLite Durable Object. */
@@ -90,4 +91,13 @@ export function licenseWritable(a) {
 
 export function requireWritable(a) {
     if (!licenseWritable(a)) throw new HttpError(402, 'Masa langganan habis. Hubungi admin untuk memperpanjang.', 'license_expired');
+}
+
+/** Fitur tenant yang diatur superadmin (disalin ke meta DO setiap kali diubah). */
+export const features = t => globalThis.Features.resolve(t.db.getMeta('features'));
+
+export function requireFeature(t, key) {
+    if (features(t)[key]) return;
+    const f = globalThis.Features.LIST.find(x => x.key === key);
+    throw new HttpError(403, `Fitur "${f ? f.label : key}" tidak aktif untuk usaha ini. Hubungi admin RasaPOS untuk mengaktifkan.`, 'feature_disabled');
 }

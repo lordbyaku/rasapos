@@ -3,7 +3,7 @@ import '../../public/js/shared/order-ops.js';
 import '../../public/js/shared/pricing.js';
 import { bad, forbidden, notFound, HttpError, readJson } from '../lib/http.js';
 import { businessDate, localHour } from '../lib/time.js';
-import { parseJson, requireOutlet, requirePerm, can, licenseWritable, actorName, scopeOutlets, staffPerms } from './base.js';
+import { parseJson, requireOutlet, requirePerm, can, licenseWritable, actorName, scopeOutlets, staffPerms, features } from './base.js';
 import { getOutlet, channels, paymentMethods, settings, audit, verifyStaffPin, activePromos } from './master.js';
 
 const { OrderOps, Money, Pricing } = globalThis;
@@ -279,10 +279,11 @@ function deductStock(t, o, byIng, a) {
 }
 
 function onPaid(t, o, a, events) {
+    const feat = features(t);
     const { byIng, costByItem } = usageOf(t, o);
     addSales(t, o, 1, null, costByItem);
-    deductStock(t, o, byIng, a);
-    if (o.customer_id) {
+    if (feat.inventory) deductStock(t, o, byIng, a);
+    if (o.customer_id && feat.marketing) {
         const loy = settings(t).loyalty;
         const pts = loy.enabled ? Math.floor(o.totals.total / loy.amount_per_point) : 0;
         t.db.exec('UPDATE customers SET points = points + ?, visits = visits + 1, total_spent = total_spent + ?, last_visit_at = ? WHERE id = ?', pts, o.totals.total, now(), o.customer_id);
@@ -418,6 +419,7 @@ function applyOrderOp(t, a, op, approval, events) {
                 const tb = tableOf(t, outletId, payload.table_id);
                 payload.table_name = tb ? tb.name : null;
             }
+            if (payload.customer_id && !features(t).marketing) payload.customer_id = null; // data pelanggan nonaktif: cukup nama
             if (payload.customer_id) {
                 const c = t.db.one('SELECT id, name FROM customers WHERE id = ?', Number(payload.customer_id));
                 if (!c) throw OpError('customer_not_found', 'Pelanggan tidak ditemukan');

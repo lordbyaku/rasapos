@@ -37,8 +37,8 @@ BO.page('settings', {
                 <h3 class="font-bold"><i class="fas fa-sliders text-brand-500 mr-2"></i>Aturan Kasir</h3>
                 <div><label class="label">Batas diskon manual tanpa persetujuan manager (%)</label><input id="st-disc" type="number" min="0" max="100" class="input" value="${s.settings.discount_limit_pct}" ${ro}></div>
                 <div><label class="label">Stasiun produksi (pisahkan dengan koma)</label><input id="st-stations" class="input" value="${esc(s.settings.stations.join(', '))}" ${ro}><p class="text-[11px] text-stone-400 mt-1">Tiket dapur dipecah per stasiun, mis. Dapur, Bar, Pastry</p></div>
-                <label class="flex items-center gap-2 text-sm"><input id="st-loy" type="checkbox" class="accent-orange-500 w-4 h-4" ${s.settings.loyalty.enabled ? 'checked' : ''} ${ro}>Aktifkan poin pelanggan</label>
-                <div><label class="label">1 poin setiap belanja (Rp)</label><input id="st-loy-amt" type="number" min="1000" class="input" value="${s.settings.loyalty.amount_per_point}" ${ro}></div>
+                <div class="${BO.has('marketing') ? 'space-y-3' : 'hidden'}"><label class="flex items-center gap-2 text-sm"><input id="st-loy" type="checkbox" class="accent-orange-500 w-4 h-4" ${s.settings.loyalty.enabled ? 'checked' : ''} ${ro}>Aktifkan poin pelanggan</label>
+                <div><label class="label">1 poin setiap belanja (Rp)</label><input id="st-loy-amt" type="number" min="1000" class="input" value="${s.settings.loyalty.amount_per_point}" ${ro}></div></div>
             </div>
             ${owner ? '<div class="xl:col-span-2 flex justify-end"><button id="st-save" class="btn-primary"><i class="fas fa-floppy-disk"></i>Simpan channel, pembayaran & aturan</button></div>' : ''}
 

@@ -53,6 +53,10 @@ npm run scenarios
 
 Opsional: backup harian ke R2 (aktifkan blok `r2_buckets` di `wrangler.jsonc`).
 
+## Fitur per tenant
+Superadmin → klik tenant → **Fitur**: KDS, Meja & denah, Inventori & resep, Promo/pelanggan/poin, Asisten AI bisa dimatikan per usaha
+(mis. usaha yang hanya butuh transaksi). Ditegakkan di server; tablet menyesuaikan saat memuat ulang data. Definisi: `public/js/shared/features.js`.
+
 ## Asisten panduan (Tanya Panduan)
 Tombol **Tanya Panduan** di `/tutorial.html` menjawab pertanyaan dari isi panduan.
 - **Tanpa pengaturan apa pun:** pencarian panduan (gratis, jalan offline) — menampilkan potongan pelajaran paling relevan + tautan ke pelajarannya.

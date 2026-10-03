@@ -4,6 +4,7 @@ import { hashSecret, randomToken } from './lib/crypto.js';
 import { licenseOf } from './license.js';
 import { addDays } from './lib/time.js';
 import { tenantStub, callDO, doKeyOf } from './do-client.js';
+import '../public/js/shared/features.js';
 import { MAX_KEYS, getSettings, saveSettings, encryptKey, hintOf, testKey, decryptText, KEY_PURPOSE } from './ai-keys.js';
 
 const DAY = 86400000;
@@ -22,7 +23,7 @@ export const adminRouter = new Router()
         const owners = await env.CORE.prepare("SELECT tenant_id, email, name FROM users WHERE role = 'owner'").all();
         const o = by(owners);
         const list = tenants.results.map(t => ({
-            ...t, license: licenseOf(t, env), owner: o[t.id] || null,
+            ...t, license: licenseOf(t, env), owner: o[t.id] || null, features: globalThis.Features.resolve(t.features),
             users: u[t.id]?.n || 0, devices: d[t.id]?.active || 0,
             trx_30d: s[t.id]?.trx || 0, sales_30d: s[t.id]?.sales || 0, outlets: s[t.id]?.outlets || 0, last_stat: s[t.id]?.last_date || null
         }));
@@ -41,7 +42,7 @@ export const adminRouter = new Router()
             env.CORE.prepare('SELECT * FROM subscription_logs WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 50').bind(t.id).all(),
             env.CORE.prepare('SELECT * FROM tenant_stats WHERE tenant_id = ? ORDER BY date DESC LIMIT 30').bind(t.id).all()
         ]);
-        return json({ tenant: { ...t, license: licenseOf(t, env) }, users: users.results, devices: devices.results, logs: logs.results, stats: stats.results });
+        return json({ tenant: { ...t, license: licenseOf(t, env), features: globalThis.Features.resolve(t.features) }, users: users.results, devices: devices.results, logs: logs.results, stats: stats.results });
     })
     .on('POST', '/tenants/:id/subscription', async (req, env, a, p) => {
         const body = await readJson(req);
@@ -78,6 +79,25 @@ export const adminRouter = new Router()
         ]);
         const nt = await env.CORE.prepare('SELECT * FROM tenants WHERE id = ?').bind(t.id).first();
         return json({ tenant: { ...nt, license: licenseOf(nt, env) } });
+    })
+    .on('PUT', '/tenants/:id/features', async (req, env, a, p) => {
+        const F = globalThis.Features;
+        const t = await env.CORE.prepare('SELECT id, do_key, features FROM tenants WHERE id = ?').bind(p.id).first();
+        if (!t) throw notFound();
+        const body = await readJson(req, 10000);
+        const before = F.resolve(t.features);
+        const next = F.resolve({ ...before, ...F.sanitize(body.features) });
+        const changes = F.LIST.filter(f => before[f.key] !== next[f.key]).map(f => `${f.label} ${next[f.key] ? 'aktif' : 'nonaktif'}`);
+        if (!changes.length) return json({ features: next });
+        // Simpan hanya yang dimatikan: fitur baru di masa depan otomatis aktif
+        const stored = Object.fromEntries(F.KEYS.filter(k => !next[k]).map(k => [k, false]));
+        // DO dulu (penegak aturan), baru D1 (cermin untuk panel)
+        await callDO(tenantStub(env, t.do_key), 'POST', '/internal/features', { features: stored }, { kind: 'system', tid: t.id, dk: t.do_key });
+        await env.CORE.batch([
+            env.CORE.prepare('UPDATE tenants SET features = ? WHERE id = ?').bind(Object.keys(stored).length ? JSON.stringify(stored) : null, t.id),
+            env.CORE.prepare('INSERT INTO subscription_logs (tenant_id, action, detail, by_user, created_at) VALUES (?, ?, ?, ?, ?)').bind(t.id, 'features', 'Fitur: ' + changes.join(', '), a.user_id, Date.now())
+        ]);
+        return json({ features: next });
     })
     .on('POST', '/tenants/:id/refresh-stats', async (req, env, a, p) => {
         const dk = await doKeyOf(env, p.id);

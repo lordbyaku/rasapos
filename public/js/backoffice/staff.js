@@ -32,7 +32,7 @@ BO.page('staff', {
             title: isNew ? 'Staff Baru' : 'Ubah Staff', size: 'max-w-2xl',
             fields: [
                 { name: 'name', label: 'Nama', required: true, value: s.name, maxlength: 60, col: 1 },
-                { name: 'role', label: 'Peran', type: 'select', value: s.role, col: 1, options: ['cashier', 'waiter', 'manager', 'kitchen'].map(r => ({ value: r, label: ROLE_LABEL[r] })) },
+                { name: 'role', label: 'Peran', type: 'select', value: s.role, col: 1, options: ['cashier', 'waiter', 'manager', ...(BO.has('kds') || s.role === 'kitchen' ? ['kitchen'] : [])].map(r => ({ value: r, label: ROLE_LABEL[r] })) },
                 { name: 'pin', label: isNew ? 'PIN (4–6 digit)' : 'PIN baru (kosongkan jika tidak diubah)', type: 'password', required: isNew, pattern: '\\d{4,6}', maxlength: 6, col: 1, placeholder: '••••', help: 'Manager wajib 6 digit' },
                 { name: 'is_active', label: 'Aktif', type: 'checkbox', value: s.is_active, col: 1 },
                 { name: 'outlet_ids', label: 'Bisa login di outlet', type: 'checks', numeric: true, value: s.outlet_ids, options: BO.outlets.map(o => ({ value: o.id, label: o.name })) },

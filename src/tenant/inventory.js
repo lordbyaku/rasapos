@@ -1,5 +1,5 @@
 import { bad, notFound, readJson, json } from '../lib/http.js';
-import { requirePerm, requireOutlet, actorName, parseJson } from './base.js';
+import { requirePerm, requireOutlet, actorName, parseJson, requireFeature } from './base.js';
 import { getOutlet, audit } from './master.js';
 
 const now = () => Date.now();
@@ -12,6 +12,7 @@ function addStock(t, outletId, ingId, delta) {
 
 export function registerInventory(router) {
     router.on('GET', '/stock', (t, req, a, p, url) => {
+        requireFeature(t, 'inventory');
         requirePerm(a, 'inventory');
         const outlet = Number(url.searchParams.get('outlet'));
         requireOutlet(a, outlet);
@@ -21,6 +22,7 @@ export function registerInventory(router) {
     });
 
     router.on('GET', '/stock/moves', (t, req, a, p, url) => {
+        requireFeature(t, 'inventory');
         requirePerm(a, 'inventory');
         const outlet = Number(url.searchParams.get('outlet'));
         requireOutlet(a, outlet);
@@ -38,6 +40,7 @@ export function registerInventory(router) {
     });
 
     router.on('POST', '/stock/moves', async (t, req, a) => {
+        requireFeature(t, 'inventory');
         requirePerm(a, 'inventory');
         const body = await readJson(req);
         const type = String(body.type || '');
@@ -102,6 +105,7 @@ export function registerInventory(router) {
 
     // HPP & margin per menu
     router.on('GET', '/reports/hpp', (t, req, a) => {
+        requireFeature(t, 'inventory');
         requirePerm(a, 'reports');
         const ings = Object.fromEntries(t.db.all('SELECT id, name, unit, cost FROM ingredients').map(i => [i.id, i]));
         const cats = Object.fromEntries(t.db.all('SELECT id, name FROM categories').map(c => [c.id, c.name]));

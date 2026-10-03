@@ -40,7 +40,7 @@ BO.page('menu', {
                 <div><b>${esc(m.name)}</b>${m.sku ? `<div class="text-xs text-stone-400">${esc(m.sku)}</div>` : ''}</div></div></td>
                 <td>${esc(this.catName(m.category_id))}</td><td>${esc(m.station || '(kategori)')}</td><td class="text-right font-semibold whitespace-nowrap">${rp(m.price)}</td>
                 <td class="text-xs text-stone-500">${esc(m.modifier_group_ids.map(id => (this.groups.find(g => g.id === id) || {}).name).filter(Boolean).join(', ') || '-')}</td>
-                <td>${m.recipe.length ? `<span class="badge bg-emerald-50 text-emerald-700">${m.recipe.length} bahan</span>` : '<span class="text-xs text-stone-400">-</span>'}</td>
+                <td>${m.recipe.length && BO.has('inventory') ? `<span class="badge bg-emerald-50 text-emerald-700">${m.recipe.length} bahan</span>` : '<span class="text-xs text-stone-400">-</span>'}</td>
                 <td class="text-right">${BO.isOwner ? `<button class="btn-light !py-1.5" data-edit="${m.id}"><i class="fas fa-pen"></i></button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="text-center text-stone-400 py-8">Belum ada menu</td></tr>';
             $$('[data-edit]').forEach(b => b.onclick = () => this.editMenu(this.menus.find(m => m.id === Number(b.dataset.edit))));
         };
@@ -85,7 +85,8 @@ BO.page('menu', {
                 { name: 'description', label: 'Deskripsi', type: 'textarea', value: m.description || '', rows: 2 },
                 { name: 'modifier_group_ids', label: 'Grup modifier / varian', type: 'checks', numeric: true, value: m.modifier_group_ids, options: this.groups.filter(g => g.is_active).map(g => ({ value: g.id, label: g.name })) },
                 { type: 'html', html: photo },
-                { type: 'html', html: recipe.html },
+                // Inventori nonaktif: editor resep disembunyikan, resep lama tetap tersimpan
+                { type: 'html', html: BO.has('inventory') ? recipe.html : `<div class="hidden">${recipe.html}</div>` },
                 { name: 'taxable', label: 'Kena pajak', type: 'checkbox', value: m.taxable, col: 1 },
                 { name: 'is_active', label: 'Aktif dijual', type: 'checkbox', value: m.is_active, col: 1 }
             ],

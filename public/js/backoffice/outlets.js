@@ -1,6 +1,6 @@
 // Outlet (pengaturan pajak, struk, jam tutup hari), area & meja, perangkat (pairing/cabut)
 BO.page('outlets', {
-    title: 'Outlet & Meja',
+    get title() { return BO.has('tables') ? 'Outlet & Meja' : 'Outlet'; },
     async render(view) {
         const lic = BO.me.tenant.license;
         const active = BO.outlets.filter(o => o.is_active).length;
@@ -16,14 +16,14 @@ BO.page('outlets', {
                     <div class="bg-stone-50 rounded-lg p-2"><div class="text-stone-400">Service</div><b>${o.service_rate}%</b></div>
                     <div class="bg-stone-50 rounded-lg p-2"><div class="text-stone-400">Tutup hari</div><b>${String(o.day_cutoff_hour).padStart(2, '0')}:00</b></div>
                 </div>
-                <div class="flex gap-2 mt-4"><button class="btn-light flex-1" data-edit="${o.id}"><i class="fas fa-gear"></i>Pengaturan</button><button class="btn-light flex-1" data-tables="${o.id}"><i class="fas fa-chair"></i>Area & Meja</button></div>
+                <div class="flex gap-2 mt-4"><button class="btn-light flex-1" data-edit="${o.id}"><i class="fas fa-gear"></i>Pengaturan</button>${BO.has('tables') ? `<button class="btn-light flex-1" data-tables="${o.id}"><i class="fas fa-chair"></i>Area & Meja</button>` : ''}</div>
             </div>`).join('')}</div>
             <div id="o-tables"></div>`;
         const add = $('#o-add');
         if (add) add.onclick = () => this.edit();
         $$('[data-edit]').forEach(b => b.onclick = () => this.edit(BO.outlets.find(o => o.id === Number(b.dataset.edit))));
         $$('[data-tables]').forEach(b => b.onclick = () => this.tables(Number(b.dataset.tables)));
-        if (BO.outlets.length) this.tables(this.tablesOutlet || BO.outlets[0].id);
+        if (BO.outlets.length && BO.has('tables')) this.tables(this.tablesOutlet || BO.outlets[0].id);
     },
 
     edit(o) {
@@ -141,7 +141,7 @@ BO.page('devices', {
             title: 'Pasangkan Perangkat', submitText: 'Buat kode',
             fields: [
                 { name: 'outlet_id', label: 'Outlet', type: 'select', options: BO.outlets.filter(o => o.is_active).map(o => ({ value: o.id, label: o.name })) },
-                { name: 'type', label: 'Jenis perangkat', type: 'select', options: [{ value: 'pos', label: 'Kasir / Waiter (POS)' }, { value: 'kds', label: 'Layar dapur (KDS)' }], col: 1 },
+                { name: 'type', label: 'Jenis perangkat', type: 'select', options: [{ value: 'pos', label: 'Kasir / Waiter (POS)' }, ...(BO.has('kds') ? [{ value: 'kds', label: 'Layar dapur (KDS)' }] : [])], col: 1 },
                 { name: 'name', label: 'Nama perangkat', required: true, value: 'Kasir-01', maxlength: 40, col: 1 }
             ],
             onSubmit: async f => {

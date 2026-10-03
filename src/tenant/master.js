@@ -3,7 +3,7 @@ import { pick } from '../lib/validate.js';
 import { hashSecret, verifySecret, randomToken } from '../lib/crypto.js';
 import { signJwt } from '../lib/jwt.js';
 import { businessDate } from '../lib/time.js';
-import { parseJson, requirePerm, requireOutlet, outletInScope, scopeOutlets, isOwner, staffPerms, actorName, can } from './base.js';
+import { parseJson, requirePerm, requireOutlet, outletInScope, scopeOutlets, isOwner, staffPerms, actorName, can, features, requireFeature } from './base.js';
 import { DEFAULT_CHANNELS, DEFAULT_PAYMENT_METHODS, DEFAULT_SETTINGS, ROLE_PERMS, ALL_STAFF_PERMS } from './schema.js';
 
 const PIN_ITER = 10000;
@@ -115,6 +115,7 @@ const RESOURCES = {
         }
     },
     promos: {
+        feature: 'marketing',
         perm: 'master', order: 'name', json: ['days', 'outlet_ids', 'channels'],
         spec: {
             name: { type: 'str', required: true, max: 60, label: 'Nama promo' },
@@ -134,6 +135,7 @@ const RESOURCES = {
         clean(d) { if (d.type === 'percent' && d.value > 100) throw bad('Diskon persen maksimal 100'); return d; }
     },
     customers: {
+        feature: 'marketing',
         perm: 'order', order: 'name',
         spec: {
             name: { type: 'str', required: true, max: 80, label: 'Nama pelanggan' },
@@ -144,10 +146,12 @@ const RESOURCES = {
         extra: () => ({ created_at: now() })
     },
     suppliers: {
+        feature: 'inventory',
         perm: 'inventory', order: 'name',
         spec: { name: { type: 'str', required: true, max: 80, label: 'Nama supplier' }, phone: { type: 'str', max: 30, default: '' }, note: { type: 'str', max: 200, default: '' }, is_active: { type: 'bool', default: 1 } }
     },
     ingredients: {
+        feature: 'inventory',
         perm: 'inventory', order: 'name',
         spec: {
             name: { type: 'str', required: true, max: 80, label: 'Nama bahan' },
@@ -158,10 +162,12 @@ const RESOURCES = {
         }
     },
     areas: {
+        feature: 'tables',
         perm: 'outlet', outletScoped: true, order: 'sort, name',
         spec: { outlet_id: { type: 'int', required: true, label: 'Outlet' }, name: { type: 'str', required: true, max: 40, label: 'Nama area' }, sort: { type: 'int', default: 0 } }
     },
     tables: {
+        feature: 'tables',
         perm: 'outlet', outletScoped: true, order: 'sort, name',
         spec: {
             outlet_id: { type: 'int', required: true, label: 'Outlet' }, area_id: { type: 'idnull', default: null },
@@ -179,7 +185,8 @@ function registerCrud(router, name, res) {
         if (!row) throw notFound();
         return row;
     };
-    const checkWrite = (a, row) => {
+    const checkWrite = (a, row, t) => {
+        if (res.feature) requireFeature(t, res.feature);
         requirePerm(a, res.perm === 'order' ? 'order' : res.perm);
         if (res.outletScoped) requireOutlet(a, row.outlet_id);
     };
@@ -202,7 +209,7 @@ function registerCrud(router, name, res) {
 
     router.on('POST', '/' + name, async (t, req, a) => {
         let d = pick(await readJson(req), res.spec);
-        checkWrite(a, d);
+        checkWrite(a, d, t);
         if (res.clean) d = res.clean(d, t);
         if (res.extra) Object.assign(d, res.extra());
         const row = t.db.insert(table, d);
@@ -211,7 +218,7 @@ function registerCrud(router, name, res) {
 
     router.on('PATCH', '/' + name + '/:id', async (t, req, a, p) => {
         const row = load(t, p.id);
-        checkWrite(a, row);
+        checkWrite(a, row, t);
         let d = pick(await readJson(req), res.spec, { partial: true });
         if (res.outletScoped && d.outlet_id !== undefined && Number(d.outlet_id) !== row.outlet_id) throw bad('Outlet tidak bisa diubah');
         if (res.clean) d = res.clean(d, t);
@@ -221,7 +228,7 @@ function registerCrud(router, name, res) {
 
     router.on('DELETE', '/' + name + '/:id', (t, req, a, p) => {
         const row = load(t, p.id);
-        checkWrite(a, row);
+        checkWrite(a, row, t);
         if (name === 'areas') {
             if (t.db.val('SELECT COUNT(*) FROM tables WHERE area_id = ? AND is_active = 1', row.id)) throw bad('Pindahkan/hapus meja di area ini dulu');
             t.db.exec('DELETE FROM areas WHERE id = ?', row.id);
@@ -257,6 +264,7 @@ function menuData(t, outletId) {
 }
 
 export function activePromos(t, outletId) {
+    if (!features(t).marketing) return [];
     return t.db.all('SELECT * FROM promos WHERE is_active = 1').map(p => parseJson(p, ['days', 'outlet_ids', 'channels']))
         .filter(p => !p.outlet_ids.length || p.outlet_ids.map(Number).includes(Number(outletId)));
 }
@@ -293,6 +301,7 @@ function bootstrap(t, a, outletId) {
         promos: activePromos(t, outletId),
         open_orders: openOrders,
         open_shift: openShift,
+        features: features(t),
         devices_online: t.devicesOnline(outletId)
     };
 }
@@ -371,6 +380,11 @@ export function registerMaster(router) {
         return { ok: true };
     }, { internal: true });
 
+    router.on('POST', '/internal/features', async (t, req) => {
+        t.db.setMeta('features', globalThis.Features.sanitize((await req.json()).features));
+        return { features: features(t) };
+    }, { internal: true });
+
     // Meta back office
     router.on('GET', '/meta', (t, req, a) => {
         const scope = scopeOutlets(a);
@@ -379,7 +393,7 @@ export function registerMaster(router) {
             tenant: { id: t.db.getMeta('tenant_id'), name: t.db.getMeta('tenant_name') },
             outlets, channels: channels(t), payment_methods: paymentMethods(t), settings: settings(t),
             categories: t.db.all('SELECT * FROM categories ORDER BY sort, name'),
-            role_perms: ROLE_PERMS, license: a.lic,
+            role_perms: ROLE_PERMS, license: a.lic, features: features(t),
             me: { kind: a.kind, role: a.role, name: a.name, outlet_ids: a.outlet_ids }
         };
     });

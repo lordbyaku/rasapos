@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.3.0] — 2026-10-03
+
+### Baru
+- **Fitur per tenant** — Superadmin → detail tenant → bagian **Fitur**: aktifkan/nonaktifkan per usaha
+  (tercatat di riwayat langganan, tampil di daftar tenant):
+  | Fitur | Jika dinonaktifkan |
+  |---|---|
+  | Layar Dapur (KDS) | Perangkat KDS tidak bisa dipasangkan; KDS yang sudah terpasang ditolak. Kasir tetap bisa "Kirim" & mencetak tiket dapur. Peran "Dapur" disembunyikan. |
+  | Meja & denah | Tab Meja, pilih/pindah meja, dan kelola Area & Meja disembunyikan & ditolak server. Dine-in tetap bisa ("Makan di tempat"). |
+  | Inventori & resep | Menu Inventori & editor resep disembunyikan; penjualan tidak memotong stok; endpoint stok ditolak. Resep lama tetap tersimpan. |
+  | Promo, pelanggan & poin | Promo tidak dikirim ke kasir & ditolak server, data pelanggan/poin tidak dipakai (cukup nama pemesan). Diskon manual tetap ada. |
+  | Asisten AI panduan | Panduan hanya memakai pencarian. |
+- Penegakan di server (Durable Object), bukan hanya disembunyikan di layar. Default semua aktif (tenant lama tidak berubah).
+- Migrasi `0004_tenant_features.sql`. Skenario simulasi M1–M4 (86 skenario).
+
+
 ## [1.2.1] — 2026-10-03
 
 ### Perbaikan

@@ -1,5 +1,5 @@
 // Service worker: app shell cache-first (aman offline), API selalu ke jaringan, foto menu di-cache permanen.
-const VERSION = '1.2.1+202610031450';
+const VERSION = '1.3.0+202610031522';
 const CACHE = 'rasapos-' + VERSION;
 const IMG_CACHE = 'rasapos-img';
 
@@ -9,7 +9,7 @@ const SHELL = [
     '/icons/icon-192.png', '/icons/icon-512.png', '/icons/favicon-32.png',
     '/vendor/sweetalert2.all.min.js', '/vendor/chart.umd.js', '/vendor/fontawesome/css/all.min.css',
     '/vendor/fontawesome/webfonts/fa-solid-900.woff2', '/vendor/fontawesome/webfonts/fa-regular-400.woff2', '/vendor/fontawesome/webfonts/fa-brands-400.woff2',
-    '/js/shared/money.js', '/js/shared/order-ops.js', '/js/shared/pricing.js',
+    '/js/shared/money.js', '/js/shared/features.js', '/js/shared/order-ops.js', '/js/shared/pricing.js',
     '/js/core/utils.js', '/js/core/api.js', '/js/core/idb.js', '/js/core/realtime.js', '/js/core/pwa.js',
     '/js/core/escpos.js', '/js/core/receipt.js', '/js/core/printer.js',
     '/js/index.js',

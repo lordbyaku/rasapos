@@ -37,11 +37,15 @@ const Admin = {
         $('#a-summary').innerHTML = card('Tenant', s.tenants) + card('Trial', s.trial, 'text-sky-600') + card('Aktif', s.active, 'text-emerald-600') + card('Tenggang', s.grace, 'text-amber-600') + card('Kedaluwarsa', s.expired, 'text-red-600') + card('Trx 30 hari', s.trx_30d.toLocaleString('id-ID')) + card('Omzet 30 hari', rp(s.sales_30d));
         this.renderRows();
     },
+    offFeatures(t) {
+        const off = Features.LIST.filter(f => !t.features[f.key]);
+        return off.length ? `<div class="text-[11px] text-amber-700"><i class="fas fa-toggle-off mr-1"></i>Nonaktif: ${off.map(f => esc(f.label)).join(', ')}</div>` : '';
+    },
     renderRows() {
         const q = $('#a-q').value.toLowerCase(), st = $('#a-state').value;
         const rows = this.data.tenants.filter(t => (!st || t.license.state === st) && (!q || t.name.toLowerCase().includes(q) || (t.owner && t.owner.email.toLowerCase().includes(q))));
         $('#a-rows').innerHTML = rows.map(t => `<tr class="cursor-pointer hover:bg-stone-50" data-t="${t.id}">
-            <td class="text-stone-400">${t.id}</td><td><b>${esc(t.name)}</b><div class="text-xs text-stone-400">${esc(t.phone || '')} · daftar ${fmtDate(t.created_at)}</div></td>
+            <td class="text-stone-400">${t.id}</td><td><b>${esc(t.name)}</b><div class="text-xs text-stone-400">${esc(t.phone || '')} · daftar ${fmtDate(t.created_at)}</div>${this.offFeatures(t)}</td>
             <td>${t.owner ? `${esc(t.owner.name)}<div class="text-xs text-stone-400">${esc(t.owner.email)}</div>` : '-'}</td>
             <td><span class="badge ${STATE_TONE[t.license.state]}">${STATE_LABEL[t.license.state]}</span></td><td>${fmtDate(t.license.until)}</td>
             <td class="text-right">${t.outlet_packs}</td><td class="text-right">${t.outlets}/${t.license.max_outlets}</td><td class="text-right">${t.devices}</td>
@@ -62,6 +66,12 @@ const Admin = {
                 <button data-a="extend_trial" class="btn-light"><i class="fas fa-hourglass-half"></i>Perpanjang trial</button>
                 ${t.status === 'suspended' ? '<button data-a="unsuspend" class="btn-success"><i class="fas fa-play"></i>Aktifkan kembali</button>' : '<button data-a="suspend" class="btn-danger"><i class="fas fa-ban"></i>Tangguhkan</button>'}
             </div>
+            <h4 class="font-bold mt-6 mb-1">Fitur</h4>
+            <p class="text-xs text-stone-500 mb-2">Matikan fitur yang tidak dibutuhkan usaha ini. Berlaku langsung di kasir, dapur & back office (perangkat menyesuaikan saat memuat ulang data).</p>
+            <div class="space-y-2">${Features.LIST.map(f => `<label class="flex items-start gap-3 p-3 rounded-xl border ${t.features[f.key] ? 'border-emerald-200 bg-emerald-50/40' : 'border-stone-200'} cursor-pointer">
+                <i class="fas ${f.icon} w-5 mt-0.5 text-center ${t.features[f.key] ? 'text-emerald-600' : 'text-stone-400'}"></i>
+                <span class="flex-1"><b>${esc(f.label)}</b><span class="block text-xs text-stone-500">${esc(f.desc)}</span></span>
+                <input type="checkbox" data-feat="${f.key}" class="mt-1 w-5 h-5 accent-orange-500" ${t.features[f.key] ? 'checked' : ''}></label>`).join('')}</div>
             <h4 class="font-bold mt-6 mb-2">Akun</h4>${d.users.map(u => `<div class="flex items-center justify-between py-2 border-b border-stone-100"><div><b>${esc(u.name)}</b> <span class="badge bg-stone-100">${ROLE_LABEL[u.role]}</span><div class="text-xs text-stone-500">${esc(u.email)} · login ${timeAgo(u.last_login_at)}</div></div><button data-rp="${u.id}" class="btn-light !py-1.5 text-xs"><i class="fas fa-key"></i>Reset</button></div>`).join('')}
             <h4 class="font-bold mt-6 mb-2">Perangkat (${d.devices.filter(x => !x.revoked_at).length} aktif)</h4>${d.devices.map(x => `<div class="text-xs py-1 ${x.revoked_at ? 'line-through text-stone-400' : ''}">${esc(x.name)} · ${x.type} · outlet #${x.outlet_id} · ${timeAgo(x.last_seen_at)}</div>`).join('') || '<p class="text-stone-400 text-xs">-</p>'}
             <div class="flex items-center mt-6 mb-2"><h4 class="font-bold flex-1">Statistik harian</h4><button id="a-stats" class="btn-light !py-1.5 text-xs"><i class="fas fa-arrows-rotate"></i>Perbarui statistik</button></div>${d.stats.map(s => `<div class="flex justify-between text-xs py-1 border-b border-stone-100"><span>${fmtDay(s.date)}</span><span>${s.trx} trx · ${rp(s.sales)}</span></div>`).join('') || '<p class="text-stone-400 text-xs">Belum ada (diisi otomatis setiap malam)</p>'}
@@ -80,6 +90,15 @@ const Admin = {
             if (a === 'extend_trial') { const v = await promptDialog('Tambah hari trial', { input: 'number', value: 7 }); if (v !== null) act('extend_trial', { days: Number(v) }); }
             if (a === 'suspend') { const v = await promptDialog('Alasan penangguhan', { validate: x => !x.trim() && 'Wajib diisi' }); if (v) act('suspend', { reason: v }); }
             if (a === 'unsuspend') act('unsuspend');
+        });
+        $$('#a-d-body [data-feat]').forEach(cb => cb.onchange = async () => {
+            const f = Features.LIST.find(x => x.key === cb.dataset.feat);
+            if (!cb.checked && !(await confirmDialog(`Nonaktifkan ${f.label}?`, f.desc, 'Nonaktifkan', true))) { cb.checked = true; return; }
+            try {
+                await API.put(`/admin/tenants/${id}/features`, { features: { [f.key]: cb.checked } });
+                toast(`${f.label} ${cb.checked ? 'diaktifkan' : 'dinonaktifkan'}`, 'success');
+                await this.load(); this.open(id);
+            } catch (e) { cb.checked = !cb.checked; errorDialog(e); }
         });
         $('#a-stats').onclick = async () => { try { await API.post(`/admin/tenants/${id}/refresh-stats`); await this.load(); this.open(id); toast('Statistik diperbarui', 'success'); } catch (e) { errorDialog(e); } };
         $$('#a-d-body [data-rp]').forEach(b => b.onclick = async () => {

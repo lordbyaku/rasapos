@@ -183,7 +183,7 @@ const OrderView = {
             <div class="p-3 border-b border-stone-200 space-y-2">
                 <div class="flex gap-1 overflow-x-auto no-scrollbar bg-stone-100 p-1 rounded-xl text-xs font-semibold">${POS.boot.channels.map(c => `<button data-ch="${c.code}" ${locked && c.code !== ch.code ? 'disabled' : ''} class="flex-1 whitespace-nowrap px-2 py-1.5 rounded-lg ${c.code === ch.code ? 'bg-white shadow-sm text-brand-600' : 'text-stone-500 disabled:opacity-40'}">${esc(c.name)}</button>`).join('')}</div>
                 <div class="flex gap-2 text-sm">
-                    ${isDine ? `<button id="ct-table" class="flex-1 px-3 py-2 rounded-xl border border-stone-200 text-left"><i class="fas fa-chair text-stone-400 mr-2"></i>${tableName ? 'Meja <b>' + esc(tableName) + '</b>' : '<span class="text-stone-400">Pilih meja</span>'}</button>
+                    ${isDine ? `${POS.has('tables') ? `<button id="ct-table" class="flex-1 px-3 py-2 rounded-xl border border-stone-200 text-left"><i class="fas fa-chair text-stone-400 mr-2"></i>${tableName ? 'Meja <b>' + esc(tableName) + '</b>' : '<span class="text-stone-400">Pilih meja</span>'}</button>` : '<div class="flex-1 px-3 py-2 text-stone-500"><i class="fas fa-utensils text-stone-400 mr-2"></i>Makan di tempat</div>'}
                     <div class="flex items-center border border-stone-200 rounded-xl"><button id="ct-gm" class="w-9 h-10 text-stone-500">−</button><span class="text-sm w-10 text-center"><i class="fas fa-user text-stone-400 text-xs"></i> <b>${guests}</b></span><button id="ct-gp" class="w-9 h-10 text-stone-500">+</button></div>`
                     : `<button id="ct-cust" class="flex-1 px-3 py-2 rounded-xl border border-stone-200 text-left truncate"><i class="fas fa-user text-stone-400 mr-2"></i>${custName ? esc(custName) : '<span class="text-stone-400">Nama pemesan / no. antrean</span>'}</button>`}
                 </div>
@@ -240,7 +240,7 @@ const OrderView = {
         $('#ct-disc').onclick = () => o && this.discountDialog(o);
         $('#ct-send').onclick = () => this.send(o);
         const pay = $('#ct-pay'); if (pay) pay.onclick = () => Payment.open(o);
-        const save = $('#ct-save'); if (save) save.onclick = async () => { if (o.items.some(i => i.status === 'new')) await this.send(o); this.newOrder(); POS.setView('tables'); };
+        const save = $('#ct-save'); if (save) save.onclick = async () => { if (o.items.some(i => i.status === 'new')) await this.send(o); this.newOrder(); POS.setView(POS.has('tables') ? 'tables' : 'orders'); };
         $$('#ct-items [data-minus]').forEach(b => b.onclick = e => { e.stopPropagation(); const it = o.items.find(i => i.id === b.dataset.minus); POS.exec(it.qty === 1 ? 'order.remove_item' : 'order.update_item', o.id, { item_id: it.id, qty: it.qty - 1 }); });
         $$('#ct-items [data-plus]').forEach(b => b.onclick = e => { e.stopPropagation(); const it = o.items.find(i => i.id === b.dataset.plus); POS.exec('order.update_item', o.id, { item_id: it.id, qty: it.qty + 1 }); });
         $$('#ct-items [data-i]').forEach(b => b.onclick = () => this.itemDialog(o, o.items.find(i => i.id === b.dataset.i)));
@@ -346,15 +346,16 @@ const OrderView = {
             else await POS.exec('order.set', o.id, { customer_name: name, customer_id: id });
             POS.closeModal();
         };
+        const member = POS.online && POS.has('marketing'); // cari/daftar member hanya bila online & fitur pelanggan aktif
         POS.modal({
-            title: 'Pelanggan',
-            body: `<div class="flex gap-2 mb-3"><input id="cs-q" class="input" placeholder="${POS.online ? 'Cari nama / no. HP pelanggan…' : 'Nama pemesan'}" value="${esc(o ? o.customer_name : this.draft.customer_name)}"><button id="cs-use" class="btn-light whitespace-nowrap">Pakai nama</button></div>
+            title: POS.has('marketing') ? 'Pelanggan' : 'Nama pemesan',
+            body: `<div class="flex gap-2 mb-3"><input id="cs-q" class="input" placeholder="${member ? 'Cari nama / no. HP pelanggan…' : 'Nama pemesan'}" value="${esc(o ? o.customer_name : this.draft.customer_name)}"><button id="cs-use" class="btn-light whitespace-nowrap">Pakai nama</button></div>
                 <div id="cs-list" class="space-y-2"></div>
-                ${POS.online ? '<button id="cs-new" class="btn-outline w-full mt-3"><i class="fas fa-user-plus"></i>Daftarkan pelanggan baru (poin)</button>' : '<p class="text-xs text-stone-500">Offline: hanya nama pemesan. Pencarian member tersedia saat online.</p>'}`
+                ${member ? '<button id="cs-new" class="btn-outline w-full mt-3"><i class="fas fa-user-plus"></i>Daftarkan pelanggan baru (poin)</button>' : POS.has('marketing') ? '<p class="text-xs text-stone-500">Offline: hanya nama pemesan. Pencarian member tersedia saat online.</p>' : ''}`
         });
         $('#cs-use').onclick = () => setCust($('#cs-q').value.trim());
         const search = debounce(async () => {
-            if (!POS.online) return;
+            if (!member) return;
             const q = $('#cs-q').value.trim();
             if (q.length < 2) { $('#cs-list').innerHTML = ''; return; }
             try {
@@ -379,7 +380,7 @@ const OrderView = {
             body: `<div class="grid grid-cols-2 gap-2">
                 ${btn('mo-bill', 'fa-file-invoice', 'Cetak pre-bill')}
                 ${btn('mo-note', 'fa-note-sticky', 'Catatan order')}
-                ${btn('mo-move', 'fa-right-left', 'Pindah meja', o.type === 'dine_in' && POS.can('table'))}
+                ${btn('mo-move', 'fa-right-left', 'Pindah meja', o.type === 'dine_in' && POS.can('table') && POS.has('tables'))}
                 ${btn('mo-merge', 'fa-object-group', 'Gabung bill', POS.can('table'))}
                 ${btn('mo-split', 'fa-scissors', 'Split bill', POS.can('table'))}
                 ${btn('mo-void', 'fa-ban', 'Batalkan order', true, 'btn-danger')}

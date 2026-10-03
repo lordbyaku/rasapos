@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { json, errorResponse, Router, forbidden, unauthorized, HttpError } from '../lib/http.js';
-import { DB } from './base.js';
+import { DB, features } from './base.js';
 import { MIGRATIONS } from './schema.js';
 import { registerMaster, initTenant } from './master.js';
 import { registerOrders } from './orders.js';
@@ -54,6 +54,9 @@ export class TenantDO extends DurableObject {
             if (owner && a.tid && Number(owner) !== Number(a.tid)) throw forbidden('Akses tenant tidak valid');
             if (a.kind === 'device' && this.db.one('SELECT device_id FROM revoked_devices WHERE device_id = ?', a.device_id)) {
                 throw unauthorized('Perangkat ini sudah dicabut aksesnya oleh pemilik', 'device_revoked');
+            }
+            if (a.kind === 'device' && a.device_type === 'kds' && !features(this).kds) {
+                throw new HttpError(403, 'Fitur Layar Dapur (KDS) tidak aktif untuk usaha ini. Hubungi admin RasaPOS.', 'feature_disabled');
             }
             if (a.kind === 'device' && a.staff) {
                 const st = this.db.one('SELECT is_active FROM staff WHERE id = ?', a.staff.id);

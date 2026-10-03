@@ -737,6 +737,7 @@
         ['Struk tidak tercetak otomatis', 'Cetak otomatis hanya untuk printer thermal (Web Serial/BLE/RawBT). Dengan Print browser, tekan tombol Cetak.'],
         ['Selisih kas setelah tutup shift', 'Cek Laporan → Audit (kas keluar, buka laci, refund) dan Laporan → Shift. Pastikan semua kas keluar dicatat dengan keterangan.'],
         ['Tanggal laporan terasa "mundur"', 'Transaksi sebelum jam pergantian hari bisnis (default 04:00) masuk ke hari sebelumnya. Ubah di Pengaturan outlet.'],
+        ['Menu Meja, Layar Dapur, Inventori, atau Promo tidak muncul', 'Fitur itu dinonaktifkan untuk usaha Anda oleh admin RasaPOS (tidak semua usaha membutuhkannya). Hubungi admin RasaPOS untuk mengaktifkan. Tablet menyesuaikan setelah memuat ulang data.'],
         ['Mengganti tablet kasir', 'Pastikan tidak ada data tertunda di tablet lama, Cabut perangkat lama, lalu pasangkan tablet baru dengan kode baru.']
     ];
 

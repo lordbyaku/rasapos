@@ -23,6 +23,10 @@ const KDS = {
             this.stations = b.settings.stations || this.stations;
             Store.set('kds_boot', { outlet: b.outlet, stations: this.stations });
         } catch (e) {
+            if (e.code === 'feature_disabled') {
+                $('#k-board').innerHTML = `<div class="m-auto text-center text-neutral-300 max-w-md"><i class="fas fa-toggle-off text-5xl text-neutral-500"></i><p class="mt-4 text-lg font-semibold">Layar Dapur (KDS) tidak aktif</p><p class="mt-1 text-sm text-neutral-400">${esc(e.message)}</p><button class="btn-primary mt-4" onclick="location.reload()">Coba lagi</button></div>`;
+                return;
+            }
             const c = Store.get('kds_boot');
             if (!c) { $('#k-board').innerHTML = `<div class="m-auto text-center text-neutral-400">${esc(e.message)}<br><button class="btn-primary mt-3" onclick="location.reload()">Coba lagi</button></div>`; return; }
             this.outlet = c.outlet; this.stations = c.stations;

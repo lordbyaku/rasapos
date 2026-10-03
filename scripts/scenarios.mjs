@@ -743,6 +743,62 @@ await t('K2 mutasi stok: transfer ke outlet sama, opname negatif, jumlah 0 ditol
 });
 
 // =====================================================================================
+// M. FITUR PER TENANT (diatur superadmin)
+// =====================================================================================
+const setFeatures = f => ok('PUT', `/admin/tenants/${reg.tenant.id}/features`, { features: f }, A);
+await t('M1 inventori & promo/pelanggan nonaktif: penjualan tetap jalan, stok & poin tidak berubah', async () => {
+    const stockBefore = Object.fromEntries((await ok('GET', `/t/stock?outlet=${o1.id}`, null, U)).items.map(i => [i.id, i.qty]));
+    const ptsBefore = (await ok('GET', '/t/customers?q=Setia', null, U)).items[0].points;
+    await setFeatures({ inventory: false, marketing: false });
+    try {
+        const boot = await ok('GET', `/t/bootstrap?outlet=${o1.id}`, null, K1);
+        assert.equal(boot.features.inventory, false);
+        assert.equal(boot.promos.length, 0, 'promo tidak dikirim ke kasir');
+        const { id, total } = await orderWith(K1, d1, [item(mKopi, { qty: 2, mods: modsOf(gSize, 'Regular') })]);
+        const set = expectOk(await one(K1, op('order.set', id, { customer_id: cust.id, customer_name: 'Tamu' })));
+        assert.equal(set.order.customer_id, null, 'id pelanggan diabaikan, nama tetap');
+        assert.equal(set.order.customer_name, 'Tamu');
+        expectCode(await one(K1, op('order.discount', id, { discount: { promo_id: promoManual.id } })), 'promo_invalid');
+        expectOk(await one(K1, op('order.pay', id, { payments: [{ method: 'qris', amount: total }] })));
+    } finally {
+        await setFeatures({ inventory: true, marketing: true });
+    }
+    const stockAfter = Object.fromEntries((await ok('GET', `/t/stock?outlet=${o1.id}`, null, U)).items.map(i => [i.id, i.qty]));
+    assert.equal(stockAfter[ingKopi.id], stockBefore[ingKopi.id], 'stok tidak dipotong');
+    assert.equal((await ok('GET', '/t/customers?q=Setia', null, U)).items[0].points, ptsBefore, 'poin tidak bertambah');
+});
+await t('M2 KDS nonaktif: layar dapur ditolak, kasir tetap bisa kirim & bayar', async () => {
+    const kds = await device(o1, 'kds', 'Dapur M2');
+    await setFeatures({ kds: false });
+    try {
+        const r = await call('GET', `/t/tickets?outlet=${o1.id}`, null, kds.H);
+        assert.equal(r.status, 403); assert.equal(r.data.code, 'feature_disabled');
+        assert.equal((await call('POST', '/t/pair-codes', { outlet_id: o1.id, type: 'kds', name: 'X' }, U)).status, 403);
+        const { id, total } = await orderWith(K1, d1, [item(mNasi)]);
+        expectOk(await one(K1, op('order.send', id, {})));
+        expectOk(await one(K1, op('order.pay', id, { payments: [{ method: 'qris', amount: total }] })));
+    } finally {
+        await setFeatures({ kds: true });
+    }
+    await ok('GET', `/t/tickets?outlet=${o1.id}`, null, kds.H);
+});
+await t('M3 meja nonaktif: kelola meja ditolak, dine-in tanpa meja tetap bisa', async () => {
+    await setFeatures({ tables: false });
+    try {
+        assert.equal((await call('POST', '/t/tables', { outlet_id: o1.id, name: 'M3' }, U)).status, 403);
+        const { id, total } = await orderWith(K1, d1, [item(mAir)], { channel: 'dine_in', guests: 2 });
+        assert.equal((await getOrder(id)).type, 'dine_in');
+        expectOk(await one(K1, op('order.pay', id, { payments: [{ method: 'qris', amount: total }] })));
+    } finally {
+        await setFeatures({ tables: true });
+    }
+});
+await t('M4 hanya superadmin yang bisa mengubah fitur', async () => {
+    assert.equal((await call('PUT', `/admin/tenants/${reg.tenant.id}/features`, { features: { kds: false } }, U)).status, 403);
+    assert.equal((await call('PUT', `/admin/tenants/${reg.tenant.id}/features`, { features: { kds: false } }, K1)).status, 403);
+});
+
+// =====================================================================================
 // L. UJI ACAK (FUZZ) + KONSISTENSI LAPORAN
 // =====================================================================================
 const fuzzOrders = [];
