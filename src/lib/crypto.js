@@ -53,3 +53,29 @@ export function timingSafeEqual(a, b) {
 export async function hmacKey(secret) {
     return crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 }
+
+// Enkripsi data rahasia di database (mis. API key pihak ketiga). Format: v1.<iv>.<ciphertext>
+const aesKeys = new Map();
+async function aesKey(secret, purpose) {
+    const id = purpose + '\u0000' + secret;
+    if (!aesKeys.has(id)) {
+        const base = await crypto.subtle.importKey('raw', enc.encode(secret), 'HKDF', false, ['deriveKey']);
+        aesKeys.set(id, await crypto.subtle.deriveKey(
+            { name: 'HKDF', hash: 'SHA-256', salt: enc.encode('rasapos'), info: enc.encode(purpose) },
+            base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']));
+    }
+    return aesKeys.get(id);
+}
+
+export async function encryptText(text, secret, purpose) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await aesKey(secret, purpose), enc.encode(text));
+    return `v1.${b64url(iv)}.${b64url(ct)}`;
+}
+
+export async function decryptText(stored, secret, purpose) {
+    const [v, iv, ct] = String(stored || '').split('.');
+    if (v !== 'v1' || !iv || !ct) throw new Error('format terenkripsi tidak dikenal');
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64urlDecode(iv) }, await aesKey(secret, purpose), b64urlDecode(ct));
+    return new TextDecoder().decode(pt);
+}

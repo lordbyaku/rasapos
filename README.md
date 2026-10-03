@@ -56,12 +56,15 @@ Opsional: backup harian ke R2 (aktifkan blok `r2_buckets` di `wrangler.jsonc`).
 ## Asisten panduan (Tanya Panduan)
 Tombol **Tanya Panduan** di `/tutorial.html` menjawab pertanyaan dari isi panduan.
 - **Tanpa pengaturan apa pun:** pencarian panduan (gratis, jalan offline) — menampilkan potongan pelajaran paling relevan + tautan ke pelajarannya.
-- **Opsional, jawaban AI (Gemini, gratis):** buat API key di [Google AI Studio](https://aistudio.google.com/apikey), lalu
-  ```bash
-  npx wrangler secret put GEMINI_API_KEY
-  ```
+- **Opsional, jawaban AI (Gemini, gratis):** buat API key di [Google AI Studio](https://aistudio.google.com/apikey), lalu masukkan di
+  **Superadmin → Asisten AI → Tambah API key** (maks. 5 kunci, langsung diuji ke Google, disimpan terenkripsi).
+  - Kunci dipakai **bergiliran (round robin)**. Kunci yang kena limit per menit diistirahatkan sesuai saran Google, kuota harian habis → sampai reset harian, kunci ditolak → 6 jam; permintaan otomatis pindah ke kunci berikutnya.
+  - Di panel yang sama: model, batas pertanyaan per usaha & total per 24 jam, status/riwayat error tiap kunci, tombol Uji/Pulihkan/Nonaktifkan.
+  - Alternatif lewat terminal: `npx wrangler secret put GEMINI_API_KEY` (ikut bergiliran).
+  - Kuota gratis Google dihitung **per project**, bukan per kunci: beberapa kunci dari project yang sama tetap berbagi satu kuota.
+  - Kunci dienkripsi dengan `JWT_SECRET`; jika secret itu diganti, kunci AI harus dimasukkan ulang.
+
   Jawaban AI hanya untuk pengguna yang login (akun Back Office atau tablet yang sudah dipasangkan); tanpa login/offline/kuota habis otomatis kembali ke pencarian.
-  Atur di `wrangler.jsonc`: `GEMINI_MODEL`, `AI_TENANT_DAILY` (batas pertanyaan per usaha per 24 jam, default 60), `AI_DAILY_LIMIT` (batas semua usaha, default 900 — di bawah kuota harian gratis Gemini).
   Catatan: di tier gratis, Google boleh memakai isi pertanyaan untuk meningkatkan produknya — jangan ketik data pribadi/rahasia di chat.
 
 ## Tablet & printer

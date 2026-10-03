@@ -34,7 +34,7 @@
     "OUTLETS_PER_PACK": "5",
     "PBKDF2_ITERATIONS": "60000",
     "MAIL_FROM": "",
-    // Asisten panduan AI: aktif bila secret GEMINI_API_KEY diisi (npx wrangler secret put GEMINI_API_KEY)
+    // Asisten panduan AI: default; API key & nilai ini bisa diatur di panel Superadmin → Asisten AI
     "GEMINI_MODEL": "gemini-3.5-flash-lite",
     "AI_TENANT_DAILY": "60",
     "AI_DAILY_LIMIT": "900"

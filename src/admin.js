@@ -4,6 +4,7 @@ import { hashSecret, randomToken } from './lib/crypto.js';
 import { licenseOf } from './license.js';
 import { addDays } from './lib/time.js';
 import { tenantStub, callDO, doKeyOf } from './do-client.js';
+import { MAX_KEYS, getSettings, saveSettings, encryptKey, hintOf, testKey, decryptText, KEY_PURPOSE } from './ai-keys.js';
 
 const DAY = 86400000;
 
@@ -92,4 +93,62 @@ export const adminRouter = new Router()
             env.CORE.prepare('UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL').bind(Date.now(), u.id)
         ]);
         return json({ ok: true, temp_password: temp });
+    })
+    // ---- Asisten AI: API key Gemini (round robin) & pengaturan ----
+    .on('GET', '/ai', async (req, env) => {
+        const keys = (await env.CORE.prepare('SELECT id, label, key_hint, is_active, uses, fails, last_used_at, last_ok_at, last_error, last_error_at, cooldown_until, created_at FROM ai_keys ORDER BY id').all()).results;
+        const usage = await env.CORE.prepare("SELECT count, window_start FROM login_attempts WHERE key = 'ai:all'").first();
+        const live = usage && Date.now() - usage.window_start < 86400000;
+        return json({ keys, max: MAX_KEYS, env_key: !!env.GEMINI_API_KEY, settings: await getSettings(env), usage: { count: live ? usage.count : 0, since: live ? usage.window_start : null } });
+    })
+    .on('POST', '/ai/keys', async (req, env) => {
+        const body = await readJson(req, 10000);
+        const key = String(body.key || '').trim();
+        const label = String(body.label || '').trim().slice(0, 60) || 'Kunci';
+        if (!/^[\w-]{20,200}$/.test(key)) throw bad('Format API key tidak valid', 'key_invalid');
+        const rows = (await env.CORE.prepare('SELECT key_enc FROM ai_keys').all()).results;
+        if (rows.length >= MAX_KEYS) throw bad(`Maksimal ${MAX_KEYS} API key. Hapus salah satu dulu.`, 'key_limit');
+        for (const r of rows) {
+            const k = await decryptText(r.key_enc, env.JWT_SECRET, KEY_PURPOSE).catch(() => null);
+            if (k === key) throw bad('API key ini sudah terdaftar', 'key_duplicate');
+        }
+        const test = await testKey(env, key);
+        if (!test.ok && /ditolak Google/.test(test.error || '')) throw bad(test.error, 'key_rejected');
+        const now = Date.now();
+        const row = await env.CORE.prepare('INSERT INTO ai_keys (label, key_enc, key_hint, created_at, last_ok_at, last_error, last_error_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id')
+            .bind(label, await encryptKey(env, key), hintOf(key), now, test.ok ? now : null, test.ok ? null : test.error, test.ok ? null : now).first();
+        return json({ id: row.id, test }, 201);
+    })
+    .on('PATCH', '/ai/keys/:id', async (req, env, a, p) => {
+        const body = await readJson(req, 10000);
+        const k = await env.CORE.prepare('SELECT id FROM ai_keys WHERE id = ?').bind(p.id).first();
+        if (!k) throw notFound();
+        if (body.label !== undefined) await env.CORE.prepare('UPDATE ai_keys SET label = ? WHERE id = ?').bind(String(body.label).trim().slice(0, 60) || 'Kunci', k.id).run();
+        if (body.is_active !== undefined) await env.CORE.prepare('UPDATE ai_keys SET is_active = ? WHERE id = ?').bind(body.is_active ? 1 : 0, k.id).run();
+        if (body.reset) await env.CORE.prepare('UPDATE ai_keys SET cooldown_until = NULL, last_error = NULL, last_error_at = NULL WHERE id = ?').bind(k.id).run();
+        return json({ ok: true });
+    })
+    .on('DELETE', '/ai/keys/:id', async (req, env, a, p) => {
+        await env.CORE.prepare('DELETE FROM ai_keys WHERE id = ?').bind(p.id).run();
+        return json({ ok: true });
+    })
+    .on('POST', '/ai/keys/:id/test', async (req, env, a, p) => {
+        const k = await env.CORE.prepare('SELECT key_enc FROM ai_keys WHERE id = ?').bind(p.id).first();
+        if (!k) throw notFound();
+        const key = await decryptText(k.key_enc, env.JWT_SECRET, KEY_PURPOSE).catch(() => null);
+        if (!key) throw bad('Kunci tidak bisa dibuka (JWT_SECRET berubah?). Hapus lalu masukkan ulang.', 'key_unreadable');
+        const test = await testKey(env, key);
+        const now = Date.now();
+        if (test.ok) await env.CORE.prepare('UPDATE ai_keys SET last_ok_at = ?, last_error = NULL, cooldown_until = NULL WHERE id = ?').bind(now, p.id).run();
+        else await env.CORE.prepare('UPDATE ai_keys SET last_error = ?, last_error_at = ?, cooldown_until = ? WHERE id = ?').bind(test.error, now, test.cooldown ? now + test.cooldown : null, p.id).run();
+        return json(test);
+    })
+    .on('PUT', '/ai/settings', async (req, env) => {
+        const body = await readJson(req, 10000);
+        const model = String(body.model || '').trim();
+        const tenantDaily = Math.round(Number(body.tenant_daily)), dailyLimit = Math.round(Number(body.daily_limit));
+        if (!/^[\w.-]{3,80}$/.test(model)) throw bad('Nama model tidak valid');
+        if (!(tenantDaily >= 0 && tenantDaily <= 100000) || !(dailyLimit >= 0 && dailyLimit <= 1000000)) throw bad('Batas harian tidak valid');
+        await saveSettings(env, { ai_model: model, ai_tenant_daily: tenantDaily, ai_daily_limit: dailyLimit });
+        return json({ settings: await getSettings(env) });
     });

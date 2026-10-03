@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0] — 2026-10-03
+
+### Baru
+- **Superadmin → Asisten AI**: kelola sampai **5 API key Gemini** dari panel (tanpa terminal).
+  - Kunci diuji ke Google sebelum disimpan, disimpan terenkripsi AES-GCM (turunan `JWT_SECRET`), hanya 4 karakter terakhir yang ditampilkan.
+  - **Round robin + failover**: tiap pertanyaan memakai kunci giliran berikutnya; bila gagal langsung pindah ke kunci lain.
+    Kunci kena limit per menit / kuota harian / ditolak otomatis diistirahatkan (cooldown) lalu dipakai lagi.
+  - Status per kunci (jumlah panggilan, gagal, error terakhir), tombol Uji, Pulihkan, Nonaktifkan, Ganti nama, Hapus.
+  - Model Gemini dan batas harian (per usaha & total) bisa diubah dari panel; nilai di `wrangler.jsonc` menjadi default.
+- Migrasi `0003_ai_keys.sql` (tabel `ai_keys`, `app_settings`).
+
+
 ## [1.1.0] — 2026-10-03
 
 ### Baru

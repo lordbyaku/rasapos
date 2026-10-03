@@ -13,11 +13,22 @@ const Admin = {
         if (!u.tenant) $('#a-bo').classList.add('hidden');
         $('#a-logout').onclick = () => { Auth.logoutUser(); location.href = '/'; };
         $$('#a-drawer [data-close]').forEach(b => b.onclick = () => $('#a-drawer').classList.add('hidden'));
+        $$('.a-tab').forEach(b => b.onclick = () => this.tab(b.dataset.tab));
         $('#a-q').oninput = () => this.renderRows();
         $('#a-state').onchange = () => this.renderRows();
         try { await this.load(); } catch (e) {
-            document.querySelector('main').innerHTML = `<div class="card p-8 text-center text-red-600">${esc(e.status === 403 ? 'Akun ini bukan superadmin. Tambahkan email ke variabel SUPERADMIN_EMAILS.' : e.message)}</div>`;
+            document.querySelector('#tab-tenants').innerHTML = `<div class="card p-8 text-center text-red-600">${esc(e.status === 403 ? 'Akun ini bukan superadmin. Tambahkan email ke variabel SUPERADMIN_EMAILS.' : e.message)}</div>`;
         }
+    },
+    tab(name) {
+        $$('.a-tab').forEach(b => {
+            const on = b.dataset.tab === name;
+            b.classList.toggle('border-brand-500', on); b.classList.toggle('text-brand-600', on);
+            b.classList.toggle('border-transparent', !on); b.classList.toggle('text-stone-500', !on);
+        });
+        $('#tab-tenants').classList.toggle('hidden', name !== 'tenants');
+        $('#tab-ai').classList.toggle('hidden', name !== 'ai');
+        if (name === 'ai') AdminAI.load().catch(errorDialog);
     },
     async load() {
         this.data = await API.get('/admin/overview');
