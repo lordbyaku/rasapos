@@ -60,22 +60,38 @@ export async function issueDeviceToken(env, device, tenant) {
     return { access_token: token, expires_in: DEVICE_TTL, license: lic };
 }
 
-async function sendResetEmail(env, email, link) {
-    if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
-        console.log(`[reset-password] ${email}: ${link}`);
+/** Pengirim email yang tersedia: binding Cloudflare Email Service (EMAIL) atau Resend. */
+export const mailEnabled = env => !!env.MAIL_FROM && !!(env.EMAIL || env.RESEND_API_KEY);
+
+export async function sendMail(env, to, subject, html, text) {
+    if (!mailEnabled(env)) return false;
+    try {
+        if (env.EMAIL) {
+            await env.EMAIL.send({ to, from: { email: env.MAIL_FROM, name: env.APP_NAME || 'RasaPOS' }, subject, html, text });
+            return true;
+        }
+        const res = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
+            body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, html, text })
+        });
+        if (!res.ok) console.error('Gagal kirim email (Resend):', res.status, await res.text());
+        return res.ok;
+    } catch (e) {
+        console.error('Gagal kirim email:', e.code || '', e.message);
         return false;
     }
-    const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
-        body: JSON.stringify({
-            from: env.MAIL_FROM, to: [email], subject: `Reset password ${env.APP_NAME || 'RasaPOS'}`,
-            html: `<p>Klik tautan berikut untuk membuat password baru (berlaku 1 jam):</p><p><a href="${link}">${link}</a></p><p>Abaikan email ini jika Anda tidak meminta reset password.</p>`
-        })
-    });
-    if (!res.ok) console.error('Gagal kirim email reset:', res.status, await res.text());
-    return res.ok;
 }
+
+function sendResetEmail(env, email, link) {
+    const app = env.APP_NAME || 'RasaPOS';
+    return sendMail(env, email, `Reset password ${app}`,
+        `<p>Klik tautan berikut untuk membuat password baru (berlaku 1 jam):</p><p><a href="${link}">${link}</a></p><p>Abaikan email ini jika Anda tidak meminta reset password.</p>`,
+        `Buka tautan berikut untuk membuat password baru (berlaku 1 jam):\n${link}\n\nAbaikan email ini jika Anda tidak meminta reset password.`);
+}
+
+/** Ubah bila isi S&K / Kebijakan Privasi berubah (dicatat saat pendaftaran) */
+export const TERMS_VERSION = '2026-10-04';
 
 const iterations = env => Number(env.PBKDF2_ITERATIONS || 60000);
 
@@ -91,6 +107,7 @@ export const authRouter = new Router()
             outlet_name: { type: 'str', max: 80, default: 'Outlet Utama' }
         });
         if (!isEmail(data.email)) throw bad('Format email tidak valid');
+        if (body.accept_terms !== true) throw bad('Setujui Syarat & Ketentuan serta Kebijakan Privasi untuk mendaftar', 'terms_required');
         await rateLimit(env, 'register:' + clientIp(req), 10, 3600);
         const exists = await env.CORE.prepare('SELECT id FROM users WHERE email = ?').bind(data.email).first();
         if (exists) throw bad('Email sudah terdaftar. Silakan login.', 'email_taken');
@@ -105,7 +122,7 @@ export const authRouter = new Router()
             .bind(data.email.toLowerCase(), hash, data.owner_name, t.id, now, now).first();
         await env.CORE.prepare('UPDATE tenants SET owner_user_id = ? WHERE id = ?').bind(user.id, t.id).run();
         await env.CORE.prepare('INSERT INTO subscription_logs (tenant_id, action, detail, created_at) VALUES (?, \'register\', ?, ?)')
-            .bind(t.id, `Trial sampai ${new Date(trialEnd).toISOString().slice(0, 10)}`, now).run();
+            .bind(t.id, `Trial sampai ${new Date(trialEnd).toISOString().slice(0, 10)}; menyetujui S&K & Kebijakan Privasi versi ${TERMS_VERSION}`, now).run();
 
         await callDO(tenantStub(env, t.do_key), 'POST', '/internal/init', { tenant_id: t.id, business_name: data.business_name, outlet_name: data.outlet_name, phone: data.phone }, { kind: 'system', tid: t.id, dk: t.do_key });
         return json(await issueUserTokens(env, user, t), 201);
@@ -149,6 +166,8 @@ export const authRouter = new Router()
     .on('POST', '/forgot', async (req, env) => {
         const { email } = await readJson(req);
         await rateLimit(env, 'forgot:' + clientIp(req), 5, 3600);
+        // Jujur bila email belum dipasang: jangan bilang "terkirim" padahal tidak
+        if (!mailEnabled(env)) throw new HttpError(503, 'Reset password lewat email belum tersedia. Hubungi admin RasaPOS untuk mengatur ulang password Anda.', 'mail_disabled');
         const user = email ? await env.CORE.prepare('SELECT id, email FROM users WHERE email = ? AND is_active = 1').bind(String(email).trim().toLowerCase()).first() : null;
         if (user) {
             const token = randomToken(32);

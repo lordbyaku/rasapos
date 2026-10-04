@@ -47,10 +47,10 @@ const stamp = Date.now();
 const email = `skenario+${stamp}@contoh.id`;
 console.log(`Skenario RasaPOS → ${BASE}\nTenant uji: ${email}\n`);
 
-const reg = await ok('POST', '/auth/register', { business_name: 'Resto Skenario', owner_name: 'Uji', email, password: 'rahasia123', outlet_name: 'Outlet A' });
+const reg = await ok('POST', '/auth/register', { accept_terms: true, business_name: 'Resto Skenario', owner_name: 'Uji', email, password: 'rahasia123', outlet_name: 'Outlet A' });
 async function loginAdmin() {
     let r = await call('POST', '/auth/login', { email: 'admin@rasapos.local', password: 'admin12345' });
-    if (r.status !== 200) r = await call('POST', '/auth/register', { business_name: 'Admin', owner_name: 'Admin', email: 'admin@rasapos.local', password: 'admin12345' });
+    if (r.status !== 200) r = await call('POST', '/auth/register', { accept_terms: true, business_name: 'Admin', owner_name: 'Admin', email: 'admin@rasapos.local', password: 'admin12345' });
     if (!r.data.user || !r.data.user.superadmin) throw new Error('admin@rasapos.local bukan superadmin — set SUPERADMIN_EMAILS di .dev.vars');
     return { authorization: 'Bearer ' + r.data.access_token };
 }
@@ -567,20 +567,85 @@ await t('G6 split/gabung/pindah offline ditolak', async () => {
         expectCode(await one(K1, op(type, id, p, { offline: true })), 'online_only', type);
     }
 });
-await t('G7 approval offline memakai approved_by (tanpa PIN)', async () => {
+/** Bukti persetujuan seperti yang dibuat tablet: RSA-OAEP(kunci publik tenant) atas {staff, PIN, op}. */
+async function seal(staffId, pin, opId, key = boot1.approval_key) {
+    const k = await crypto.subtle.importKey('jwk', { kty: key.jwk.kty, n: key.jwk.n, e: key.jwk.e, alg: 'RSA-OAEP-256', ext: true }, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
+    const ct = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, k, new TextEncoder().encode(JSON.stringify({ s: staffId, p: pin, o: opId })));
+    return key.kid + '.' + Buffer.from(ct).toString('base64url');
+}
+/** Operasi offline dengan persetujuan bertanda bukti */
+async function sealedOp(type, orderId, payload, staffId, pin, extra) {
+    const o = op(type, orderId, payload, extra);
+    o.payload.approval = { staff_id: staffId, proof: await seal(staffId, pin, o.op_id) };
+    o.payload.approved_by = staffId;
+    return o;
+}
+await t('G7 persetujuan offline dengan bukti PIN terenkripsi diterima & ditandai offline di audit', async () => {
+    assert.ok(boot1.approval_key && boot1.approval_key.jwk.n, 'tablet menerima kunci publik');
     const id = randomUUID();
-    const it = item(mAir);
+    const it = item(mAir), it2 = item(mAir);
     const off = { offline: true, at: Date.now() - 100000 };
-    const it2 = item(mAir);
     const r = await ops(K1, [
         op('order.open', id, { id, order_no: no(d1) }, off),
         op('order.add_items', id, { items: [it, it2] }, off),
         op('order.send', id, {}, off),
-        op('order.void_item', id, { item_id: it.id, reason: 'offline', approved_by: sMgr.id }, off)
+        await sealedOp('order.void_item', id, { item_id: it.id, reason: 'offline' }, sMgr.id, '654321', off)
     ]);
     r.forEach(x => expectOk(x));
-    expectCode(await one(K1, op('order.void', id, { reason: 'x', approved_by: 999999 }, off)), 'approval_invalid', 'approved_by palsu');
-    expectCode(await one(K1, op('order.void', id, { reason: 'x', approved_by: sKasir2.id }, off)), 'approval_invalid', 'kasir tidak berwenang');
+    const a = (await ok('GET', `/t/audit?outlet=${o1.id}`, null, U)).items.find(x => x.action === 'void_item' && x.ref === r[0].order.order_no);
+    assert.equal(a.data.approval_offline, true, 'audit menandai persetujuan offline');
+    assert.equal(a.data.approved_by, 'Mgr');
+});
+await t('G8 ANTI-CURANG: persetujuan offline tanpa bukti / PIN salah / bukti dipakai ulang / bukti palsu ditolak', async () => {
+    const off = () => ({ offline: true, at: Date.now() - 100000 });
+    const { id } = await orderWith(K1, d1, [item(mAir), item(mAir)]);
+    expectOk(await one(K1, op('order.send', id, {})));
+    // 1) cara lama: hanya ID manager, tanpa PIN
+    expectCode(await one(K1, op('order.void', id, { reason: 'curang', approved_by: sMgr.id }, off())), 'approval_invalid', 'tanpa bukti');
+    // 2) bukti dengan PIN salah
+    expectCode(await one(K1, await sealedOp('order.void', id, { reason: 'curang' }, sMgr.id, '111111', off())), 'approval_invalid', 'PIN salah');
+    // 3) bukti sah dipakai ulang untuk operasi lain (op_id berbeda)
+    const good = await sealedOp('order.void', id, { reason: 'x' }, sMgr.id, '654321', off());
+    const replay = op('order.void', id, { reason: 'curang', approval: good.payload.approval, approved_by: sMgr.id }, off());
+    expectCode(await one(K1, replay), 'approval_invalid', 'bukti dipakai ulang');
+    // 4) bukti untuk manager A tapi diklaim manager lain / kasir
+    const o4 = op('order.void', id, { reason: 'curang' }, off());
+    o4.payload.approval = { staff_id: sKasir2.id, proof: await seal(sMgr.id, '654321', o4.op_id) };
+    expectCode(await one(K1, o4), 'approval_invalid', 'staff tidak cocok');
+    // 5) bukti sampah / kunci lain
+    const o5 = op('order.void', id, { reason: 'curang', approval: { staff_id: sMgr.id, proof: 'abc.def' } }, off());
+    expectCode(await one(K1, o5), 'approval_invalid', 'bukti sampah');
+    // 6) PIN kasir di bukti: kasir tidak berwenang
+    expectCode(await one(K1, await sealedOp('order.void', id, { reason: 'curang' }, sKasir2.id, '5678', off())), 'approval_invalid', 'kasir tidak berwenang');
+    // order tetap utuh
+    assert.equal((await getOrder(id)).status, 'open');
+    // bukti yang benar tetap bisa dipakai sekali
+    expectOk(await one(K1, good));
+    assert.equal((await getOrder(id)).status, 'void');
+});
+await t('G9 tebak PIN lewat bukti offline terkunci setelah 5 kali salah', async () => {
+    const mgr = (await ok('POST', '/t/staff', { name: 'Mgr Kunci', role: 'manager', pin: '246802', ...staffBoth }, U)).item;
+    const { id } = await orderWith(K1, d1, [item(mAir)]);
+    expectOk(await one(K1, op('order.send', id, {})));
+    const off = () => ({ offline: true, at: Date.now() - 100000 });
+    for (let i = 0; i < 5; i++) expectCode(await one(K1, await sealedOp('order.void', id, { reason: 'tebak' }, mgr.id, String(100000 + i), off())), 'approval_invalid');
+    const locked = await one(K1, await sealedOp('order.void', id, { reason: 'benar' }, mgr.id, '246802', off()));
+    assert.equal(locked.code, 'pin_locked', 'PIN benar pun ditahan saat terkunci (tablet mencoba lagi nanti)');
+    assert.equal(locked.status, 429);
+    expectOk(await one(M1, op('order.void', id, { reason: 'beres' })));
+});
+await t('G10 tablet tidak pernah menerima hash PIN server; verifier tablet terpisah', async () => {
+    const b = await ok('GET', `/t/bootstrap?outlet=${o1.id}`, null, K1);
+    for (const s of b.staff) {
+        assert.equal(s.pin_hash, undefined, 'pin_hash tidak dikirim');
+        if (s.pin_check) assert.match(s.pin_check, /^pbkdf2\$100000\$/);
+    }
+    const mgr = b.staff.find(s => s.id === sMgr.id);
+    assert.ok(mgr.pin_check, 'staff baru langsung punya verifier');
+    const list = await ok('GET', '/t/staff', null, U);
+    assert.ok(list.items.every(s => s.pin_hash === undefined && s.pin_check === undefined), 'back office tidak melihat hash');
+    const exp = await ok('GET', '/t/export', null, U);
+    assert.ok(exp.tables.staff.every(s => s.pin_hash === undefined && s.pin_check === undefined), 'ekspor pemilik tanpa hash');
 });
 
 // =====================================================================================
@@ -598,7 +663,7 @@ await t('H2 perangkat outlet A tidak bisa membuka order outlet B', async () => {
     assert.equal(r2.status, 403);
 });
 await t('H3 tenant lain tidak bisa melihat data', async () => {
-    const other = await ok('POST', '/auth/register', { business_name: 'Tetangga', owner_name: 'T', email: `tetangga+${stamp}@contoh.id`, password: 'rahasia123' });
+    const other = await ok('POST', '/auth/register', { accept_terms: true, business_name: 'Tetangga', owner_name: 'T', email: `tetangga+${stamp}@contoh.id`, password: 'rahasia123' });
     const H = { authorization: 'Bearer ' + other.access_token };
     const { id } = await orderWith(K1, d1, [item(mAir)]);
     assert.equal((await call('GET', '/t/orders/' + id, null, H)).status, 404);
@@ -606,7 +671,7 @@ await t('H3 tenant lain tidak bisa melihat data', async () => {
     assert.ok(!m.items.some(x => x.name === 'Kopi Susu'));
 });
 await t('H3b tenant baru mendapat kunci penyimpanan acak (bukan nomor urut)', async () => {
-    const other = await ok('POST', '/auth/register', { business_name: 'Baru', owner_name: 'B', email: `baru+${stamp}@contoh.id`, password: 'rahasia123' });
+    const other = await ok('POST', '/auth/register', { accept_terms: true, business_name: 'Baru', owner_name: 'B', email: `baru+${stamp}@contoh.id`, password: 'rahasia123' });
     const payload = JSON.parse(Buffer.from(other.access_token.split('.')[1], 'base64url'));
     assert.ok(payload.dk && payload.dk !== 'tenant:' + payload.tid && payload.dk.length > 20, 'dk=' + payload.dk);
 });
@@ -936,6 +1001,52 @@ await t('N10 semua fitur mati sekaligus: alur kasir dasar tetap lengkap (buka �
         const boot = await ok('GET', `/t/bootstrap?outlet=${o1.id}`, null, K1);
         assert.deepEqual(boot.features, { kds: false, tables: false, inventory: false, marketing: false, ai: false });
     });
+});
+
+// =====================================================================================
+// O. KESIAPAN JUAL: impor menu, S&K, lupa password, panel sistem
+// =====================================================================================
+await t('O1 impor menu CSV: pratinjau, validasi baris, kategori baru, perbarui berdasarkan SKU/nama', async () => {
+    const before = (await ok('GET', '/t/menus', null, U)).items.length;
+    const bad = await ok('POST', '/t/menus/import', { rows: [{ name: '', price: '1000' }, { name: 'A', price: 'gratis' }, { name: 'B', price: '5000' }, { name: 'b', price: '6000' }] }, U);
+    assert.equal(bad.saved, false);
+    assert.deepEqual(bad.errors.map(e => e.line), [2, 3, 5], JSON.stringify(bad.errors));
+    const rows = [
+        { name: 'Impor Satu', price: 'Rp 12.500', category: 'Kategori Impor', sku: 'IMP1', station: 'Bar' },
+        { name: 'Impor Dua', price: '8000', category: 'kategori impor', taxable: 'tidak' },
+        { name: mNasi.name, price: '36000' }
+    ];
+    const dry = await ok('POST', '/t/menus/import', { rows, dry_run: true }, U);
+    assert.deepEqual([dry.create, dry.update, dry.categories, dry.saved], [2, 1, ['Kategori Impor'], false]);
+    assert.equal((await ok('GET', '/t/menus', null, U)).items.length, before, 'pratinjau tidak menyimpan');
+    const r = await ok('POST', '/t/menus/import', { rows }, U);
+    assert.equal(r.saved, true);
+    const menus = (await ok('GET', '/t/menus', null, U)).items;
+    const one = menus.find(m => m.sku === 'IMP1'), two = menus.find(m => m.name === 'Impor Dua'), nasi = menus.find(m => m.id === mNasi.id);
+    assert.equal(one.price, 12500); assert.equal(one.station, 'Bar');
+    assert.equal(two.taxable, 0); assert.equal(one.category_id, two.category_id, 'kategori sama (beda huruf besar/kecil)');
+    assert.equal(nasi.price, 36000, 'menu lama diperbarui'); assert.equal(nasi.category_id, mNasi.category_id, 'kategori lama tidak terhapus');
+    await ok('PATCH', `/t/menus/${mNasi.id}`, { price: mNasi.price }, U);
+    const again = await ok('POST', '/t/menus/import', { rows: [{ name: 'Nama Baru', price: '15000', sku: 'IMP1' }] }, U);
+    assert.equal(again.update, 1, 'SKU sama → diperbarui, bukan dobel');
+    assert.equal((await call('POST', '/t/menus/import', { rows }, K1)).status, 403, 'kasir tidak boleh impor');
+    assert.equal((await call('POST', '/t/menus/import', { rows: Array.from({ length: 1001 }, (_, i) => ({ name: 'x' + i, price: 1 })) }, U)).status, 400);
+});
+await t('O2 daftar wajib menyetujui S&K; lupa password jujur bila email belum aktif', async () => {
+    const r = await call('POST', '/auth/register', { business_name: 'Tanpa SK', owner_name: 'X', email: `tanpask+${stamp}@contoh.id`, password: 'rahasia123' });
+    assert.equal(r.status, 400); assert.equal(r.data.code, 'terms_required');
+    const f = await fetch(BASE + '/api/auth/forgot', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
+    const fd = await f.json();
+    assert.ok(f.status === 503 ? fd.code === 'mail_disabled' : f.status === 200, 'tanpa email: pesan jujur, bukan "terkirim"');
+    const d = await ok('GET', `/admin/tenants/${reg.tenant.id}`, null, A);
+    assert.ok(d.logs.some(l => l.action === 'register' && /S&K/.test(l.detail)), 'persetujuan S&K tercatat');
+});
+await t('O3 panel sistem & perawatan harian (superadmin saja)', async () => {
+    const s = await ok('GET', '/admin/system', null, A);
+    assert.ok(typeof s.errors.day === 'number' && 'email' in s.services && 'backup' in s.services);
+    const m = await ok('POST', '/admin/system/maintenance', {}, A);
+    assert.equal(typeof m.errors, 'number');
+    assert.equal((await call('GET', '/admin/system', null, U)).status, 403);
 });
 
 // =====================================================================================

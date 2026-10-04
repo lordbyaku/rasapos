@@ -20,7 +20,7 @@ async function ok(method, path, body, headers) {
 const email = `owner+${Date.now()}@contoh.id`;
 console.log('Smoke test RasaPOS →', BASE);
 
-const reg = await ok('POST', '/auth/register', { business_name: 'Kopi Uji', owner_name: 'Uji', email, password: 'rahasia123', outlet_name: 'Sudirman' });
+const reg = await ok('POST', '/auth/register', { accept_terms: true, business_name: 'Kopi Uji', owner_name: 'Uji', email, password: 'rahasia123', outlet_name: 'Sudirman' });
 const U = { authorization: 'Bearer ' + reg.access_token };
 assert.equal(reg.tenant.license.state, 'trial');
 log('Daftar tenant baru (trial)');
@@ -67,7 +67,8 @@ log(`Pairing perangkat (kode ${pc.code}) → device ${pair.device.code}`);
 
 const boot = await ok('GET', '/t/bootstrap', null, D);
 assert.equal(boot.menus.length, 2);
-assert.ok(boot.staff.find(s => s.name === 'Rina').pin_hash, 'hash PIN tersedia untuk login offline');
+assert.ok(boot.staff.find(s => s.name === 'Rina').pin_check, 'verifier PIN tersedia untuk login offline');
+assert.ok(boot.staff.every(s => s.pin_hash === undefined), 'hash PIN server tidak dikirim ke tablet');
 const noStaff = await call('POST', '/t/ops', { ops: [{ op_id: randomUUID(), type: 'shift.open', payload: { shift_id: randomUUID(), opening_cash: 0 } }] }, D);
 assert.equal(noStaff.data.results[0].status, 403, 'tanpa login staff ditolak');
 const wrongPin = await call('POST', '/t/staff-login', { staff_id: kasir.item.id, pin: '0000' }, D);

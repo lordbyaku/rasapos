@@ -9,6 +9,7 @@ import { adminRouter } from './admin.js';
 import { coreTenantRouter } from './core-tenant.js';
 import { forwardToDO, doKeyOf } from './do-client.js';
 import { handleAssist } from './assist.js';
+import { logError, dailyMaintenance } from './monitor.js';
 
 export { TenantDO } from './tenant/tenant-do.js';
 
@@ -82,14 +83,24 @@ async function handleApi(request, env, url) {
 }
 
 export default {
-    async fetch(request, env) {
+    async fetch(request, env, ctx) {
         const url = new URL(request.url);
         if (url.pathname === '/') return env.ASSETS.fetch(new Request(url.origin + '/index.html', request));
         if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+        let res, message;
         try {
-            return await handleApi(request, env, url);
+            res = await handleApi(request, env, url);
         } catch (e) {
-            return errorResponse(e);
+            res = errorResponse(e);
+            message = e && e.message;
         }
+        // Error server (termasuk dari Durable Object) dicatat untuk panel superadmin
+        if (res.status >= 500 && res.status !== 503) ctx.waitUntil(logError(env, request, res.status, message || 'HTTP ' + res.status));
+        return res;
+    },
+
+    // Cron harian (lihat "triggers" di wrangler.jsonc)
+    async scheduled(event, env, ctx) {
+        ctx.waitUntil(dailyMaintenance(env));
     }
 };

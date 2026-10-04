@@ -191,6 +191,19 @@ const BO = {
      * fields: [{name, label, type, options, value, required, help, placeholder, min, max, step, col}]
      * type: text|email|password|number|money|textarea|select|checkbox|checks|color|time|date|html|section
      */
+    /** Modal isi bebas (tanpa form field generik) */
+    modal({ title, body, size = 'max-w-lg' }) {
+        $('#bo-modal-title').textContent = title;
+        $('#bo-modal-box').className = `bg-white rounded-2xl w-full ${size} max-h-[92vh] flex flex-col overflow-hidden`;
+        const form = $('#bo-modal-form');
+        form.innerHTML = body;
+        form.onsubmit = e => e.preventDefault();
+        $('#bo-modal-foot').innerHTML = '<button type="button" data-close class="btn-light">Tutup</button>';
+        $$('#bo-modal-foot [data-close]').forEach(b => b.onclick = () => closeModal('bo-modal'));
+        openModal('bo-modal');
+        return form;
+    },
+
     form({ title, fields, submitText = 'Simpan', size = 'max-w-lg', onSubmit, extraButtons = '' }) {
         $('#bo-modal-title').textContent = title;
         $('#bo-modal-box').className = `bg-white rounded-2xl w-full ${size} max-h-[92vh] flex flex-col overflow-hidden`;

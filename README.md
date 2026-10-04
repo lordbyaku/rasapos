@@ -51,7 +51,35 @@ npm run scenarios
 5. `npm run deploy`
 6. Daftar dengan email superadmin di aplikasi.
 
-Opsional: backup harian ke R2 (aktifkan blok `r2_buckets` di `wrangler.jsonc`).
+Domain produksi: **https://pos.trisna.web.id** (Workers custom domain; `*.workers.dev` tetap aktif).
+
+## Backup & pemulihan
+1. Dashboard Cloudflare → **R2** → aktifkan R2 (tier gratis 10 GB; Cloudflare meminta metode pembayaran untuk aktivasi).
+2. `npx wrangler r2 bucket create rasapos-backup`
+3. Buka komentar `r2_buckets` di `wrangler.jsonc`, commit & push.
+
+Setelah aktif: backup otomatis tiap tenant setiap malam 03:30 WIB (`tenant-<id>/<tanggal>.json`, disimpan 35 hari) berisi semua data termasuk hash PIN, kunci persetujuan, dan foto menu.
+Superadmin → klik tenant → **Backup**: "Backup sekarang" dan **Pulihkan** (ketik nama usaha untuk konfirmasi; keadaan sebelum pulih dicadangkan otomatis).
+Database inti (D1) punya Time Travel bawaan Cloudflare (pemulihan titik waktu 30 hari): `npx wrangler d1 time-travel restore rasapos-core --timestamp <waktu>`.
+
+## Email (reset password & ringkasan error)
+Tanpa email, "Lupa password" menampilkan pesan untuk menghubungi admin (superadmin bisa reset dari panel).
+Pilihan A — Cloudflare Email Service: Dashboard → Email Service → onboard domain pengirim (mis. `trisna.web.id`), isi var `MAIL_FROM` (mis. `noreply@trisna.web.id`), buka komentar `send_email` di `wrangler.jsonc`.
+Pilihan B — Resend: `npx wrangler secret put RESEND_API_KEY` + isi `MAIL_FROM`.
+
+## Keamanan anti-curang
+- Persetujuan manager (void, diskon besar, refund) selalu diverifikasi server. Saat offline, tablet mengenkripsi PIN manager dengan kunci publik tenant (RSA-OAEP); server membuka & memverifikasi PIN saat sinkron. Bukti terikat ke satu transaksi, tidak bisa dipakai ulang; tebakan salah ikut terkunci 5×.
+- Tablet tidak pernah menerima hash PIN server, hanya verifier terpisah (`pin_check`). Staff lama mendapat verifier setelah login online sekali (sebelum itu login offline belum tersedia untuk staff tersebut).
+- Audit menandai persetujuan offline (`approval_offline`).
+
+## Pemantauan
+Superadmin → **Sistem**: error server 24 jam/7 hari, endpoint yang paling sering error, status email/backup/AI. Cron harian 08:00 WIB membersihkan log lama dan mengirim ringkasan error ke email superadmin (bila email aktif).
+
+## Legal
+`/syarat.html` dan `/privasi.html` (draf). Lengkapi bagian `[dalam kurung siku]` dan minta tinjauan ahli hukum. Pendaftar wajib mencentang persetujuan; versinya dicatat (`TERMS_VERSION` di `src/auth.js`).
+
+## Impor menu
+Back Office → Menu & Harga → **Impor CSV** (template tersedia). Kolom: nama, harga, kategori, stasiun, sku, deskripsi, pajak. Pratinjau dulu; SKU/nama sama → diperbarui; kategori baru dibuat otomatis; maks. 1000 baris.
 
 ## Fitur per tenant
 Superadmin → klik tenant → **Fitur**: KDS, Meja & denah, Inventori & resep, Promo/pelanggan/poin, Asisten AI bisa dimatikan per usaha

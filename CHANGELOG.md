@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.4.0] — 2026-10-04
+
+Perbaikan tahap 1 dari audit kelayakan jual.
+
+### Keamanan (anti-curang)
+- **Persetujuan manager offline tidak bisa dipalsukan lagi.** Sebelumnya operasi offline cukup membawa ID manager. Kini tablet mengenkripsi PIN manager untuk server (RSA-OAEP per tenant); server memverifikasi PIN saat sinkron, bukti terikat ke satu operasi (tidak bisa dipakai ulang), tebakan salah ikut kunci 5×. Format lama tanpa bukti ditolak.
+- **Hash PIN server tidak lagi dikirim ke tablet.** Tablet memakai verifier terpisah (`pin_check`, PBKDF2 100.000 iterasi, salt berbeda). Staff lama mendapat verifier setelah login online sekali.
+- PIN manager tidak pernah tersimpan terbuka di antrean tablet (sebelumnya bisa, bila operasi tertunda saat online).
+- Audit menandai persetujuan offline (`approval_offline`).
+
+### Baru
+- **Backup & pemulihan**: backup harian ke R2 (35 hari, termasuk PIN, kunci, foto), "Backup sekarang" & "Pulihkan" di superadmin (konfirmasi nama usaha, cadangan otomatis sebelum pulih). Aktif setelah R2 diaktifkan.
+- **Impor menu CSV** dengan pratinjau, validasi per baris, kategori otomatis, pembaruan berdasarkan SKU/nama.
+- **Superadmin → Sistem**: log error server, status email/backup/AI; cron harian (bersih-bersih + ringkasan error via email).
+- **Email**: dukungan Cloudflare Email Service (binding `EMAIL`) selain Resend. "Lupa password" kini jujur bila email belum aktif.
+- **Syarat & Ketentuan** dan **Kebijakan Privasi** (draf, UU PDP); persetujuan wajib saat daftar dan versinya dicatat.
+- Domain produksi `pos.trisna.web.id` (APP_URL).
+
+### Perbaikan (ditemukan simulasi)
+- Impor: harga berupa teks (mis. "gratis") sempat lolos sebagai Rp 0 — kini ditolak.
+- Impor: kategori sama beda huruf besar/kecil sempat dibuat dua kali — kini satu.
+
+### Pengujian
+- Skenario G7–G10 (anti-curang) & O1–O3: total 102 skenario, 3× berturut-turut lulus; uji pemulihan backup end-to-end; smoke & unit lulus.
+- Migrasi: D1 `0005_error_events.sql`; skema tenant v2 (`staff.pin_check`) otomatis.
+
 ## [1.3.1] — 2026-10-03
 
 Simulasi lanjutan fitur per tenant (96 skenario + 13 uji round robin AI, 3× berturut-turut lulus).

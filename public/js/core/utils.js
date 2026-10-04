@@ -118,6 +118,33 @@ function downloadCSV(name, rows, columns) {
     downloadBlob(name, new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }));
 }
 
+/** Baca CSV → array baris (array sel). Mendeteksi pemisah , atau ; dari baris judul. */
+function parseCSV(text) {
+    text = String(text || '').replace(/^\uFEFF/, '');
+    const first = text.split(/\r?\n/)[0] || '';
+    const sep = (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';' : ',';
+    const rows = [];
+    let row = [], cell = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (q) {
+            if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+            else if (c === '"') q = false;
+            else cell += c;
+        } else if (c === '"') q = true;
+        else if (c === sep) { row.push(cell); cell = ''; }
+        else if (c === '\n' || c === '\r') {
+            if (c === '\r' && text[i + 1] === '\n') i++;
+            row.push(cell); cell = '';
+            if (row.some(x => x.trim() !== '')) rows.push(row);
+            row = [];
+        } else cell += c;
+    }
+    row.push(cell);
+    if (row.some(x => x.trim() !== '')) rows.push(row);
+    return rows;
+}
+
 /** Kompres gambar ke WebP (maks. sisi 600px) untuk foto menu */
 async function compressImage(file, max = 600, quality = 0.8) {
     const img = await createImageBitmap(file);

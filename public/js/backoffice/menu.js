@@ -20,11 +20,61 @@ BO.page('menu', {
     catName(id) { const c = this.cats.find(x => x.id === id); return c ? c.name : '-'; },
     readonly() { return !BO.isOwner ? '<div class="mb-3 p-3 rounded-xl bg-amber-50 text-amber-800 text-sm"><i class="fas fa-lock mr-1"></i>Menu master hanya bisa diubah pemilik. Anda dapat mengatur harga & ketersediaan per outlet.</div>' : ''; },
 
+    // ---------------------------------------------------------------- IMPOR CSV
+    IMPORT_COLS: { nama: 'name', name: 'name', menu: 'name', harga: 'price', price: 'price', kategori: 'category', category: 'category', stasiun: 'station', station: 'station', sku: 'sku', kode: 'sku', deskripsi: 'description', description: 'description', pajak: 'taxable', taxable: 'taxable' },
+    importDialog() {
+        BO.modal({
+            title: 'Impor Menu dari CSV', size: 'max-w-2xl',
+            body: `<div class="space-y-3 text-sm">
+                <p>Siapkan berkas CSV (Excel → Simpan sebagai CSV) dengan judul kolom: <b>nama, harga, kategori</b> (wajib nama & harga), opsional <b>stasiun, sku, deskripsi, pajak</b> (ya/tidak).</p>
+                <p class="text-stone-500">Menu dengan SKU atau nama yang sama akan <b>diperbarui</b>; kolom kosong tidak menimpa data lama. Kategori yang belum ada dibuat otomatis. Varian & resep diatur setelah impor.</p>
+                <div class="flex flex-wrap gap-2"><button id="imp-tpl" class="btn-light"><i class="fas fa-download"></i>Unduh template</button><label class="btn-primary cursor-pointer"><i class="fas fa-file-csv"></i>Pilih berkas CSV<input id="imp-file" type="file" accept=".csv,text/csv" class="hidden"></label></div>
+                <div id="imp-preview"></div></div>`
+        });
+        $('#imp-tpl').onclick = () => downloadCSV('template-menu.csv', [
+            { nama: 'Nasi Goreng Spesial', harga: 35000, kategori: 'Makanan', stasiun: 'Dapur', sku: 'NG01', deskripsi: 'Dengan telur & ayam', pajak: 'ya' },
+            { nama: 'Es Teh Manis', harga: 8000, kategori: 'Minuman', stasiun: 'Bar', sku: 'ET01', deskripsi: '', pajak: 'ya' }
+        ], ['nama', 'harga', 'kategori', 'stasiun', 'sku', 'deskripsi', 'pajak'].map(k => ({ key: k, label: k })));
+        $('#imp-file').onchange = async e => {
+            const f = e.target.files[0];
+            if (!f) return;
+            if (f.size > 2_000_000) return errorDialog(new Error('Berkas terlalu besar (maks. 2 MB)'));
+            const rows = parseCSV(await f.text());
+            if (rows.length < 2) return errorDialog(new Error('Berkas kosong atau tanpa baris data'));
+            const head = rows[0].map(h => this.IMPORT_COLS[h.trim().toLowerCase()] || null);
+            if (!head.includes('name') || !head.includes('price')) return errorDialog(new Error('Kolom "nama" dan "harga" wajib ada di baris judul'));
+            const data = rows.slice(1).map(r => Object.fromEntries(head.map((k, i) => [k, r[i]]).filter(([k]) => k)));
+            await this.importRun(data, true);
+        };
+    },
+    async importRun(data, dry) {
+        const box = $('#imp-preview');
+        box.innerHTML = '<div class="py-6 text-center text-stone-400"><i class="fas fa-spinner fa-spin"></i></div>';
+        try {
+            const r = await API.post('/t/menus/import', { rows: data, dry_run: dry });
+            if (r.errors.length) {
+                box.innerHTML = `<div class="p-3 rounded-xl bg-red-50 text-red-700"><b>${r.errors.length} baris bermasalah — perbaiki berkas lalu pilih ulang:</b><ul class="list-disc ml-5 mt-1 max-h-48 overflow-y-auto">${r.errors.slice(0, 50).map(x => `<li>Baris ${x.line}: ${esc(x.error)}</li>`).join('')}</ul></div>`;
+                return;
+            }
+            if (dry) {
+                box.innerHTML = `<div class="p-3 rounded-xl bg-stone-50"><b>Pratinjau:</b> ${r.create} menu baru, ${r.update} diperbarui${r.categories.length ? `, kategori baru: ${r.categories.map(esc).join(', ')}` : ''}.</div>
+                    <div class="max-h-56 overflow-y-auto mt-2 border border-stone-200 rounded-xl"><table class="tbl text-xs"><thead><tr><th>Nama</th><th class="text-right">Harga</th><th>Kategori</th></tr></thead><tbody>${data.slice(0, 200).map(d => `<tr><td>${esc(d.name || '')}</td><td class="text-right">${esc(d.price || '')}</td><td>${esc(d.category || '')}</td></tr>`).join('')}</tbody></table></div>
+                    <div class="flex justify-end mt-3"><button id="imp-go" class="btn-primary"><i class="fas fa-check"></i>Simpan ${r.create + r.update} menu</button></div>`;
+                $('#imp-go').onclick = () => this.importRun(data, false);
+                return;
+            }
+            closeModal('bo-modal');
+            toast(`Impor selesai: ${r.create} baru, ${r.update} diperbarui`, 'success');
+            this.load();
+        } catch (e) { box.innerHTML = ''; errorDialog(e); }
+    },
+
     // ---------------------------------------------------------------- MENU
     tab_menus(el) {
         if (BO.isOwner) {
-            $('#m-actions').innerHTML = '<button id="m-add" class="btn-primary"><i class="fas fa-plus"></i>Menu baru</button>';
+            $('#m-actions').innerHTML = '<button id="m-import" class="btn-light"><i class="fas fa-file-import"></i>Impor CSV</button><button id="m-add" class="btn-primary"><i class="fas fa-plus"></i>Menu baru</button>';
             $('#m-add').onclick = () => this.editMenu();
+            $('#m-import').onclick = () => this.importDialog();
         }
         const active = this.menus.filter(m => m.is_active);
         el.innerHTML = this.readonly() + `

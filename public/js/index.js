@@ -36,7 +36,7 @@ $('#view-login').addEventListener('submit', e => {
 $('#view-register').addEventListener('submit', e => {
     e.preventDefault();
     submitWith(e.target, async d => {
-        const res = await API.publicPost('/auth/register', d);
+        const res = await API.publicPost('/auth/register', { ...d, accept_terms: !!d.accept_terms });
         Auth.saveUser(res);
         await SwalBase.fire({ icon: 'success', title: 'Selamat datang!', html: `Trial Anda aktif sampai <b>${fmtDate(res.tenant.license.until)}</b>.<br>Mulai dengan menambah menu, staff, lalu pasangkan tablet kasir.` });
         location.href = '/backoffice.html';

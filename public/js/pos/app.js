@@ -127,10 +127,12 @@ const POS = {
     async exec(type, orderId, payload = {}, opts = {}) {
         const sessionOnline = this.online && Auth.staff && Auth.staff.staff_token;
         const op = { op_id: uuid(), type, order_id: orderId, payload, at: Date.now(), staff_id: this.staff.id, offline: !sessionOnline };
-        if (op.offline && payload.approval) {
-            // Jangan simpan PIN di perangkat: saat offline cukup ID manager yang sudah diverifikasi lokal
+        if (payload.approval && payload.approval.pin) {
+            // PIN manager tidak pernah disimpan terbuka di antrean: dienkripsi untuk server (diverifikasi saat sinkron)
+            const proof = await this.sealApproval(payload.approval, op.op_id);
+            if (proof) payload.approval = { staff_id: payload.approval.staff_id, proof };
+            else if (op.offline) throw new Error('Persetujuan offline belum tersedia di tablet ini. Sambungkan internet lalu muat ulang data.');
             payload.approved_by = payload.approval.staff_id;
-            delete payload.approval;
         }
         let next = null;
         if (type.startsWith('order.')) {
@@ -221,8 +223,24 @@ const POS = {
     },
 
     // ---------------------------------------------------------------- PIN
+    /** Enkripsi {staff, PIN, op} dengan kunci publik tenant → hanya server yang bisa membuka & memverifikasi. */
+    async sealApproval(ap, opId) {
+        const k = this.boot && this.boot.approval_key;
+        if (!k || !crypto.subtle) return null;
+        if (!this._akey || this._akey.kid !== k.kid) {
+            this._akey = { kid: k.kid, key: await crypto.subtle.importKey('jwk', { kty: k.jwk.kty, n: k.jwk.n, e: k.jwk.e, alg: 'RSA-OAEP-256', ext: true }, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']) };
+        }
+        const data = new TextEncoder().encode(JSON.stringify({ s: ap.staff_id, p: String(ap.pin), o: opId }));
+        const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, this._akey.key, data));
+        let s = '';
+        ct.forEach(b => { s += String.fromCharCode(b); });
+        return k.kid + '.' + btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    },
+
+    /** true/false = PIN benar/salah; null = staff belum punya verifier offline (perlu login online sekali). */
     async verifyPinLocal(staff, pin) {
-        const [alg, iter, salt, hash] = String(staff.pin_hash || '').split('$');
+        if (!staff.pin_check) return null;
+        const [alg, iter, salt, hash] = String(staff.pin_check).split('$');
         if (alg !== 'pbkdf2') return false;
         const enc = new TextEncoder();
         const key = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveBits']);
@@ -291,7 +309,9 @@ const POS = {
             }
         }
         if (!session) {
-            if (!(await this.verifyPinLocal(staff, pin))) throw new Error('PIN salah');
+            const v = await this.verifyPinLocal(staff, pin);
+            if (v === null) throw new Error(`${staff.name} belum bisa login offline. Sambungkan internet untuk login pertama kali.`);
+            if (!v) throw new Error('PIN salah');
             session = { staff: { id: staff.id, name: staff.name, role: staff.role, perms: staff.perms }, staff_token: null, exp: Date.now() + 16 * 3600000 };
             toast('Login offline — transaksi akan disinkronkan saat online', 'info', 4000);
         }
@@ -433,7 +453,10 @@ const POS = {
             preConfirm: async () => {
                 const id = Number($('#ap-staff').value), pin = $('#ap-pin').value;
                 const m = managers.find(x => x.id === id);
-                if (!(await this.verifyPinLocal(m, pin))) { Swal.showValidationMessage('PIN salah'); return false; }
+                const v = await this.verifyPinLocal(m, pin);
+                if (v === false) { Swal.showValidationMessage('PIN salah'); return false; }
+                // Verifier belum ada: saat online server yang memverifikasi; saat offline tidak bisa
+                if (v === null && !(this.online && Auth.staff && Auth.staff.staff_token)) { Swal.showValidationMessage(`${m.name} belum bisa menyetujui offline. Sambungkan internet.`); return false; }
                 return { staff_id: id, pin, name: m.name };
             }
         });
@@ -503,7 +526,7 @@ const POS = {
             if (await IDB.count('outbox')) return errorDialog(new Error('Masih ada transaksi yang belum tersinkron. Sambungkan internet terlebih dahulu.'));
             const managers = this.boot.staff.filter(s => s.role === 'manager');
             if (managers.length) {
-                const r = await SwalBase.fire({ title: 'PIN manager', input: 'password', inputAttributes: { inputmode: 'numeric', maxlength: 6 }, showCancelButton: true, preConfirm: async v => { for (const m of managers) if (await this.verifyPinLocal(m, v)) return true; Swal.showValidationMessage('PIN salah'); return false; } });
+                const r = await SwalBase.fire({ title: 'PIN manager', input: 'password', inputAttributes: { inputmode: 'numeric', maxlength: 6 }, showCancelButton: true, preConfirm: async v => { for (const m of managers) if (await this.verifyPinLocal(m, v)) return true; Swal.showValidationMessage(managers.some(m => m.pin_check) ? 'PIN salah' : 'PIN manager belum tersedia di tablet ini. Minta manager login sekali saat online.'); return false; } });
                 if (!r.isConfirmed) return;
             } else if (!(await confirmDialog('Lepas pasangan perangkat ini?', '', 'Lepas', true))) return;
             Auth.device = null; Auth.staff = null;

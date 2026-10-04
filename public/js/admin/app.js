@@ -28,7 +28,9 @@ const Admin = {
         });
         $('#tab-tenants').classList.toggle('hidden', name !== 'tenants');
         $('#tab-ai').classList.toggle('hidden', name !== 'ai');
+        $('#tab-system').classList.toggle('hidden', name !== 'system');
         if (name === 'ai') AdminAI.load().catch(errorDialog);
+        if (name === 'system') AdminSystem.load().catch(errorDialog);
     },
     async load() {
         this.data = await API.get('/admin/overview');
@@ -36,6 +38,24 @@ const Admin = {
         const card = (l, v, tone = '') => `<div class="card p-4"><div class="text-xs text-stone-500">${l}</div><div class="text-2xl font-extrabold ${tone}">${v}</div></div>`;
         $('#a-summary').innerHTML = card('Tenant', s.tenants) + card('Trial', s.trial, 'text-sky-600') + card('Aktif', s.active, 'text-emerald-600') + card('Tenggang', s.grace, 'text-amber-600') + card('Kedaluwarsa', s.expired, 'text-red-600') + card('Trx 30 hari', s.trx_30d.toLocaleString('id-ID')) + card('Omzet 30 hari', rp(s.sales_30d));
         this.renderRows();
+    },
+    async backups(id, t) {
+        const box = $('#a-backups');
+        try {
+            const r = await API.get(`/admin/tenants/${id}/backups`);
+            if (!r.enabled) { box.innerHTML = '<span class="text-amber-700"><i class="fas fa-triangle-exclamation mr-1"></i>Penyimpanan backup (R2) belum diaktifkan. Lihat README → Backup.</span>'; $('#a-backup').disabled = true; return; }
+            box.innerHTML = r.items.length ? r.items.slice(0, 40).map(b => `<div class="flex items-center gap-2 py-1 border-b border-stone-100"><span class="flex-1 font-mono">${esc(b.key.split('/')[1])}</span><span>${Math.ceil(b.size / 1024)} KB · ${fmtDateTime(b.uploaded)}</span><button data-restore="${esc(b.key)}" class="btn-light !py-1 !px-2 text-xs"><i class="fas fa-clock-rotate-left"></i>Pulihkan</button></div>`).join('')
+                : 'Belum ada backup. Backup otomatis berjalan setiap malam (03:30 WIB).';
+            $$('#a-backups [data-restore]').forEach(b => b.onclick = async () => {
+                const v = await promptDialog('Pulihkan data dari backup?', { label: `Semua data ${t.name} akan diganti isi ${b.dataset.restore.split('/')[1]}. Keadaan sekarang dicadangkan dulu. Ketik nama usaha untuk melanjutkan:`, placeholder: t.name });
+                if (v === null) return;
+                try {
+                    const res = await API.post(`/admin/tenants/${id}/restore`, { key: b.dataset.restore, confirm: v });
+                    infoDialog('Data dipulihkan', `<p class="text-sm">${Object.entries(res.counts).filter(([, n]) => n).map(([k, n]) => `${esc(k)}: ${n}`).join(', ')}</p><p class="text-xs text-stone-500 mt-2">Cadangan sebelum pulih: ${esc(res.safety.split('/')[1])}. Minta tablet outlet memuat ulang data.</p>`, 'success');
+                    this.backups(id, t);
+                } catch (e) { errorDialog(e); }
+            });
+        } catch (e) { box.textContent = e.message; }
     },
     offFeatures(t) {
         const off = Features.LIST.filter(f => !t.features[f.key]);
@@ -72,6 +92,8 @@ const Admin = {
                 <i class="fas ${f.icon} w-5 mt-0.5 text-center ${t.features[f.key] ? 'text-emerald-600' : 'text-stone-400'}"></i>
                 <span class="flex-1"><b>${esc(f.label)}</b><span class="block text-xs text-stone-500">${esc(f.desc)}</span></span>
                 <input type="checkbox" data-feat="${f.key}" class="mt-1 w-5 h-5 accent-orange-500" ${t.features[f.key] ? 'checked' : ''}></label>`).join('')}</div>
+            <div class="flex items-center mt-6 mb-2"><h4 class="font-bold flex-1">Backup</h4><button id="a-backup" class="btn-light !py-1.5 text-xs"><i class="fas fa-cloud-arrow-up"></i>Backup sekarang</button></div>
+            <div id="a-backups" class="text-xs text-stone-500">Memuat…</div>
             <h4 class="font-bold mt-6 mb-2">Akun</h4>${d.users.map(u => `<div class="flex items-center justify-between py-2 border-b border-stone-100"><div><b>${esc(u.name)}</b> <span class="badge bg-stone-100">${ROLE_LABEL[u.role]}</span><div class="text-xs text-stone-500">${esc(u.email)} · login ${timeAgo(u.last_login_at)}</div></div><button data-rp="${u.id}" class="btn-light !py-1.5 text-xs"><i class="fas fa-key"></i>Reset</button></div>`).join('')}
             <h4 class="font-bold mt-6 mb-2">Perangkat (${d.devices.filter(x => !x.revoked_at).length} aktif)</h4>${d.devices.map(x => `<div class="text-xs py-1 ${x.revoked_at ? 'line-through text-stone-400' : ''}">${esc(x.name)} · ${x.type} · outlet #${x.outlet_id} · ${timeAgo(x.last_seen_at)}</div>`).join('') || '<p class="text-stone-400 text-xs">-</p>'}
             <div class="flex items-center mt-6 mb-2"><h4 class="font-bold flex-1">Statistik harian</h4><button id="a-stats" class="btn-light !py-1.5 text-xs"><i class="fas fa-arrows-rotate"></i>Perbarui statistik</button></div>${d.stats.map(s => `<div class="flex justify-between text-xs py-1 border-b border-stone-100"><span>${fmtDay(s.date)}</span><span>${s.trx} trx · ${rp(s.sales)}</span></div>`).join('') || '<p class="text-stone-400 text-xs">Belum ada (diisi otomatis setiap malam)</p>'}
@@ -100,6 +122,10 @@ const Admin = {
                 await this.load(); this.open(id);
             } catch (e) { cb.checked = !cb.checked; errorDialog(e); }
         });
+        this.backups(id, t);
+        $('#a-backup').onclick = async () => {
+            try { const r = await API.post(`/admin/tenants/${id}/backup`); toast(`Backup tersimpan (${Math.ceil(r.size / 1024)} KB)`, 'success'); this.backups(id, t); } catch (e) { errorDialog(e); }
+        };
         $('#a-stats').onclick = async () => { try { await API.post(`/admin/tenants/${id}/refresh-stats`); await this.load(); this.open(id); toast('Statistik diperbarui', 'success'); } catch (e) { errorDialog(e); } };
         $$('#a-d-body [data-rp]').forEach(b => b.onclick = async () => {
             if (!(await confirmDialog('Reset password akun ini?'))) return;

@@ -1,6 +1,6 @@
 {
   "name": "rasapos-cloud",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "private": true,
   "description": "POS Food & Beverage multi-outlet di Cloudflare (Workers + Durable Objects + D1)",
   "type": "module",

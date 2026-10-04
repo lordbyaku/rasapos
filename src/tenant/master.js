@@ -4,9 +4,13 @@ import { hashSecret, verifySecret, randomToken } from '../lib/crypto.js';
 import { signJwt } from '../lib/jwt.js';
 import { businessDate } from '../lib/time.js';
 import { parseJson, requirePerm, requireOutlet, outletInScope, scopeOutlets, isOwner, staffPerms, actorName, can, features, requireFeature } from './base.js';
+import { approvalPublicKey } from './approval.js';
 import { DEFAULT_CHANNELS, DEFAULT_PAYMENT_METHODS, DEFAULT_SETTINGS, ROLE_PERMS, ALL_STAFF_PERMS } from './schema.js';
 
 const PIN_ITER = 10000;
+// Verifier untuk tablet: salt & iterasi berbeda dari hash server, sehingga hash server tidak pernah keluar.
+// 100.000 = batas PBKDF2 di Workers; menebak PIN dari verifier ini jauh lebih mahal daripada dari hash server.
+const PIN_CHECK_ITER = 100000;
 const now = () => Date.now();
 
 // ---------------------------------------------------------------- util
@@ -273,10 +277,11 @@ function bootstrap(t, a, outletId) {
     requireOutlet(a, outletId);
     const outlet = getOutlet(t, outletId);
     const { menus, today } = menuData(t, outletId);
-    const staff = t.db.all('SELECT id, name, role, pin_hash, permissions, outlet_ids, locked_until FROM staff WHERE is_active = 1 ORDER BY name')
+    const staff = t.db.all('SELECT id, name, role, pin_check, permissions, outlet_ids, locked_until FROM staff WHERE is_active = 1 ORDER BY name')
         .map(s => parseJson(s, ['outlet_ids']))
         .filter(s => s.outlet_ids.map(Number).includes(Number(outletId)))
-        .map(s => ({ id: s.id, name: s.name, role: s.role, pin_hash: s.pin_hash, perms: staffPerms(s) }));
+        // pin_check null (staff lama sebelum login online pertama) → login offline belum tersedia untuk staff itu
+        .map(s => ({ id: s.id, name: s.name, role: s.role, pin_check: s.pin_check || null, perms: staffPerms(s) }));
     const openOrders = t.db.all("SELECT data FROM orders WHERE outlet_id = ? AND status = 'open' ORDER BY opened_at", outletId).map(r => JSON.parse(r.data));
     const openShift = a.kind === 'device' ? t.db.one("SELECT * FROM shifts WHERE device_id = ? AND status = 'open' ORDER BY opened_at DESC", a.device_id) : null;
     return {
@@ -320,6 +325,8 @@ export async function verifyStaffPin(t, staffId, pin, outletId) {
         throw unauthorized(failed >= 5 ? 'PIN salah 5 kali. Dikunci 5 menit.' : 'PIN salah', 'pin_invalid');
     }
     if (s.failed || s.locked_until) t.db.exec('UPDATE staff SET failed = 0, locked_until = NULL WHERE id = ?', s.id);
+    // Staff lama: buat verifier tablet saat PIN terbukti benar (PIN asli hanya ada di momen ini)
+    if (!s.pin_check) t.db.exec('UPDATE staff SET pin_check = ? WHERE id = ?', await hashSecret(String(pin), PIN_CHECK_ITER), s.id);
     return { ...s, perms: staffPerms(s) };
 }
 
@@ -345,22 +352,129 @@ async function cleanStaff(t, a, d, pin) {
         if (!/^\d{4,6}$/.test(String(pin))) throw bad('PIN harus 4–6 digit angka');
         if (d.role === 'manager' && String(pin).length < 6) throw bad('PIN manager wajib 6 digit');
         d.pin_hash = await hashSecret(String(pin), PIN_ITER);
+        d.pin_check = await hashSecret(String(pin), PIN_CHECK_ITER);
         d.failed = 0; d.locked_until = null;
     }
     return d;
 }
 
 // ---------------------------------------------------------------- export
-export function exportAll(t) {
-    const tables = t.db.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '\\_%' ESCAPE '\\' AND name NOT IN ('files', 'ops', 'sqlite_sequence')").map(r => r.name);
-    const out = { exported_at: new Date().toISOString(), tenant_id: t.db.getMeta('tenant_id'), tables: {} };
+const userTables = t => t.db.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '\\_%' ESCAPE '\\' AND name NOT IN ('files', 'ops', 'sqlite_sequence')").map(r => r.name);
+
+/**
+ * Ekspor data tenant. Unduhan pemilik: tanpa rahasia & foto.
+ * Backup (secrets): termasuk hash PIN, kunci persetujuan, dan foto menu (base64) agar bisa dipulihkan utuh.
+ */
+export function exportAll(t, { secrets = false } = {}) {
+    const tables = userTables(t);
+    const out = { format: 1, exported_at: new Date().toISOString(), tenant_id: t.db.getMeta('tenant_id'), schema_version: t.db.getMeta('schema_version'), tables: {} };
     for (const name of tables) out.tables[name] = t.db.all(`SELECT * FROM ${name}`);
-    for (const s of out.tables.staff || []) delete s.pin_hash;
+    if (secrets) {
+        out.files = t.db.all('SELECT id, mime, data, created_at FROM files').map(f => ({ ...f, data: bytesToB64(new Uint8Array(f.data)) }));
+    } else {
+        out.tables.meta = (out.tables.meta || []).filter(m => !['approval_key'].includes(m.key));
+    }
+    if (!secrets) for (const s of out.tables.staff || []) { delete s.pin_hash; delete s.pin_check; }
     return out;
+}
+
+function bytesToB64(bytes) {
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+}
+
+/**
+ * Pulihkan dari backup: semua tabel diganti isi backup dalam satu transaksi.
+ * Hanya kolom yang ada di skema sekarang yang diisi (backup lama tetap bisa dipulihkan setelah migrasi).
+ */
+export function importAll(t, data) {
+    if (!data || data.format !== 1 || !data.tables) throw bad('Berkas backup tidak dikenali');
+    if (String(data.tenant_id) !== String(t.db.getMeta('tenant_id'))) throw forbidden('Backup ini milik tenant lain');
+    const tables = userTables(t);
+    const counts = {};
+    t.ctx.storage.transactionSync(() => {
+        for (const name of tables) {
+            const rows = data.tables[name];
+            if (!Array.isArray(rows)) continue;
+            const cols = t.db.all(`PRAGMA table_info(${name})`).map(c => c.name);
+            if (name === 'meta') {
+                // versi skema tetap milik penyimpanan sekarang
+                for (const r of rows) if (r.key !== 'schema_version') t.db.exec('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', r.key, r.value);
+                counts[name] = rows.length;
+                continue;
+            }
+            t.db.exec(`DELETE FROM ${name}`);
+            for (const r of rows) {
+                const keys = Object.keys(r).filter(k => cols.includes(k));
+                if (keys.length) t.db.exec(`INSERT INTO ${name} (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`, ...keys.map(k => r[k]));
+            }
+            counts[name] = rows.length;
+        }
+        if (Array.isArray(data.files)) {
+            t.db.exec('DELETE FROM files');
+            for (const f of data.files) {
+                const bin = atob(f.data);
+                const bytes = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                t.db.exec('INSERT INTO files (id, mime, data, created_at) VALUES (?, ?, ?, ?)', f.id, f.mime, bytes, f.created_at);
+            }
+            counts.files = data.files.length;
+        }
+        // Operasi yang sudah tercatat tidak boleh dianggap duplikat setelah data diganti
+        t.db.exec('DELETE FROM ops');
+    });
+    return counts;
 }
 
 // ---------------------------------------------------------------- router
 export function registerMaster(router) {
+    // Impor menu massal (CSV dari Back Office). dry_run → pratinjau tanpa menyimpan.
+    router.on('POST', '/menus/import', async (t, req, a) => {
+        requirePerm(a, 'master');
+        const body = await readJson(req);
+        const rows = Array.isArray(body.rows) ? body.rows : [];
+        if (!rows.length) throw bad('Tidak ada baris untuk diimpor');
+        if (rows.length > 1000) throw bad('Maksimal 1000 menu per impor');
+        const cats = new Map(t.db.all('SELECT id, name FROM categories').map(c => [c.name.trim().toLowerCase(), c.id]));
+        const bySku = new Map(t.db.all("SELECT id, sku FROM menus WHERE sku != ''").map(m => [m.sku.trim().toLowerCase(), m.id]));
+        const byName = new Map(t.db.all('SELECT id, name FROM menus').map(m => [m.name.trim().toLowerCase(), m.id]));
+        const errors = [], plan = [], newCats = new Map(), seen = new Set(); // kategori baru: kunci huruf kecil → nama pertama yang ditemukan
+        rows.forEach((r, i) => {
+            const line = i + 2; // baris 1 = judul kolom
+            const name = String(r.name || '').trim();
+            // Harga harus angka: "12500", "12.500", "Rp 12.500", "12.500,00" (sen dibuang). Teks seperti "gratis" ditolak.
+            const rawPrice = String(r.price ?? '').trim();
+            const price = Number(rawPrice.replace(/[.,]\d{1,2}$/, '').replace(/[^\d]/g, ''));
+            if (!name) return errors.push({ line, error: 'Nama kosong' });
+            if (name.length > 80) return errors.push({ line, error: 'Nama lebih dari 80 karakter' });
+            if (!/^(rp\.?\s*)?\d[\d.,\s]*$/i.test(rawPrice) || price > 100000000) return errors.push({ line, error: `Harga tidak valid: "${rawPrice.slice(0, 20)}"` });
+            const sku = String(r.sku || '').trim().slice(0, 40);
+            const key = (sku || name).toLowerCase();
+            if (seen.has(key)) return errors.push({ line, error: `Duplikat di berkas: ${sku || name}` });
+            seen.add(key);
+            const category = String(r.category || '').trim().slice(0, 60);
+            if (category && !cats.has(category.toLowerCase()) && !newCats.has(category.toLowerCase())) newCats.set(category.toLowerCase(), category);
+            const id = (sku && bySku.get(sku.toLowerCase())) || byName.get(name.toLowerCase()) || null;
+            const taxable = !/^(0|tidak|no|false|n)$/i.test(String(r.taxable ?? '').trim());
+            plan.push({ id, name, price, sku, category, station: String(r.station || '').trim().slice(0, 30) || null, description: String(r.description || '').trim().slice(0, 300), taxable });
+        });
+        const summary = { create: plan.filter(p => !p.id).length, update: plan.filter(p => p.id).length, categories: [...newCats.values()], errors };
+        if (errors.length || body.dry_run) return { ...summary, saved: false };
+        t.ctx.storage.transactionSync(() => {
+            let sort = Number(t.db.val('SELECT COALESCE(MAX(sort), 0) FROM categories'));
+            for (const c of newCats.values()) cats.set(c.toLowerCase(), t.db.insert('categories', { name: c, color: '#f97316', station: 'Dapur', sort: ++sort, is_active: 1 }).id);
+            let msort = Number(t.db.val('SELECT COALESCE(MAX(sort), 0) FROM menus'));
+            for (const p of plan) {
+                const d = { name: p.name, price: p.price, sku: p.sku, description: p.description, station: p.station, taxable: p.taxable ? 1 : 0, category_id: p.category ? cats.get(p.category.toLowerCase()) : null, is_active: 1, updated_at: now() };
+                // Perbarui: kolom kosong di berkas tidak menimpa data yang sudah ada
+                if (p.id) { if (!p.category) delete d.category_id; if (!p.station) delete d.station; if (!p.description) delete d.description; if (!p.sku) delete d.sku; t.db.update('menus', p.id, d); }
+                else t.db.insert('menus', { ...d, modifier_group_ids: '[]', recipe: '[]', sort: ++msort });
+            }
+        });
+        audit(t, null, 'menu_import', null, a, { create: summary.create, update: summary.update, categories: summary.categories.length });
+        return { ...summary, saved: true };
+    });
     for (const [name, res] of Object.entries(RESOURCES)) registerCrud(router, name, res);
 
     // Internal (dipanggil Worker)
@@ -410,7 +524,7 @@ export function registerMaster(router) {
         };
     });
 
-    router.on('GET', '/bootstrap', (t, req, a, p, url) => bootstrap(t, a, Number(url.searchParams.get('outlet') || a.outlet_id)));
+    router.on('GET', '/bootstrap', async (t, req, a, p, url) => ({ ...bootstrap(t, a, Number(url.searchParams.get('outlet') || a.outlet_id)), approval_key: await approvalPublicKey(t) }));
 
     // Login staff dengan PIN di perangkat outlet
     router.on('POST', '/staff-login', async (t, req, a) => {
@@ -488,7 +602,7 @@ export function registerMaster(router) {
         const d = await cleanStaff(t, a, pick(body, staffSpec), body.pin);
         d.created_at = now();
         const s = t.db.insert('staff', d);
-        delete s.pin_hash;
+        delete s.pin_hash; delete s.pin_check;
         return json({ item: parseJson(s, ['outlet_ids', 'permissions']) }, 201);
     });
     router.on('PATCH', '/staff/:id', async (t, req, a, p) => {
@@ -501,7 +615,7 @@ export function registerMaster(router) {
         if (body.role === 'manager' && s.role !== 'manager' && !body.pin) throw bad('Masukkan PIN 6 digit baru untuk peran manager');
         const d = await cleanStaff(t, a, { role: body.role || s.role, ...pick(body, staffSpec, { partial: true }) }, body.pin);
         const out = t.db.update('staff', s.id, d);
-        delete out.pin_hash;
+        delete out.pin_hash; delete out.pin_check;
         return { item: parseJson(out, ['outlet_ids', 'permissions']) };
     });
 
@@ -603,6 +717,7 @@ export function registerMaster(router) {
     }, { public: true });
 
     // Ekspor seluruh data tenant (backup)
+    router.on('GET', '/internal/export-full', t => exportAll(t, { secrets: true }), { internal: true });
     router.on('GET', '/export', (t, req, a) => {
         if (!isOwner(a)) throw forbidden('Hanya pemilik yang dapat mengekspor data');
         return new Response(JSON.stringify(exportAll(t)), {

@@ -14,6 +14,13 @@ registerOrders(router);
 registerReports(router);
 registerInventory(router);
 router.on('POST', '/internal/push-stats', async t => { await t.pushStats(); return { ok: true }; }, { internal: true });
+router.on('POST', '/internal/backup', async t => t.backup(), { internal: true });
+router.on('POST', '/internal/restore', async (t, req) => {
+    const { importAll } = await import('./master.js');
+    const counts = importAll(t, await req.json());
+    await t.pushStats();
+    return { ok: true, counts };
+}, { internal: true });
 
 /** Event yang diteruskan ke perangkat back office (selain itu hanya ke perangkat outlet). */
 const USER_EVENTS = new Set(['sale.new', 'order.updated', 'presence', 'shift.updated', 'ticket.new']);
@@ -138,17 +145,27 @@ export class TenantDO extends DurableObject {
         await this.env.CORE.batch([...dailyStats(this).map(s => stmt.bind(tenantId, s.date, s.outlets, s.trx, s.sales, online, Date.now())), featStmt]);
     }
 
+    /** Backup ke R2: tenant-<id>/<tanggal>.json (ditimpa bila diulang di hari yang sama), simpan 35 hari. */
+    async backup() {
+        if (!this.env.BACKUP) throw new HttpError(503, 'Penyimpanan backup (R2) belum diaktifkan', 'backup_disabled');
+        const tenantId = this.db.getMeta('tenant_id');
+        const { exportAll } = await import('./master.js');
+        const body = JSON.stringify(exportAll(this, { secrets: true }));
+        const key = `tenant-${tenantId}/${businessDate(Date.now(), 420, 0)}.json`;
+        await this.env.BACKUP.put(key, body, { httpMetadata: { contentType: 'application/json' }, customMetadata: { tenant_id: String(tenantId) } });
+        const cutoff = Date.now() - 35 * 86400000;
+        const old = (await this.env.BACKUP.list({ prefix: `tenant-${tenantId}/` })).objects.filter(o => o.uploaded.getTime() < cutoff).map(o => o.key);
+        if (old.length) await this.env.BACKUP.delete(old);
+        return { key, size: body.length };
+    }
+
     async alarm() {
         try {
             const tenantId = this.db.getMeta('tenant_id');
             if (tenantId) {
                 await this.pushStats();
                 this.db.exec('DELETE FROM ops WHERE created_at < ?', Date.now() - 45 * 86400000);
-                if (this.env.BACKUP) {
-                    const { exportAll } = await import('./master.js');
-                    const date = businessDate(Date.now(), 420, 0);
-                    await this.env.BACKUP.put(`tenant-${tenantId}/${date}.json`, JSON.stringify(exportAll(this)), { httpMetadata: { contentType: 'application/json' } });
-                }
+                if (this.env.BACKUP) await this.backup();
             }
         } catch (e) {
             console.error('alarm gagal', e);

@@ -5,6 +5,7 @@ import { licenseOf } from './license.js';
 import { addDays } from './lib/time.js';
 import { tenantStub, callDO, doKeyOf } from './do-client.js';
 import '../public/js/shared/features.js';
+import { systemStatus, dailyMaintenance } from './monitor.js';
 import { MAX_KEYS, getSettings, saveSettings, encryptKey, hintOf, testKey, decryptText, KEY_PURPOSE } from './ai-keys.js';
 
 const DAY = 86400000;
@@ -105,6 +106,40 @@ export const adminRouter = new Router()
         }
         return json({ features: next });
     })
+    .on('GET', '/tenants/:id/backups', async (req, env, a, p) => {
+        if (!env.BACKUP) return json({ enabled: false, items: [] });
+        const list = await env.BACKUP.list({ prefix: `tenant-${Number(p.id)}/` });
+        return json({ enabled: true, items: list.objects.map(o => ({ key: o.key, size: o.size, uploaded: o.uploaded.getTime() })).sort((x, y) => y.uploaded - x.uploaded) });
+    })
+    .on('POST', '/tenants/:id/backup', async (req, env, a, p) => {
+        const dk = await doKeyOf(env, p.id);
+        return json(await callDO(tenantStub(env, dk), 'POST', '/internal/backup', {}, { kind: 'system', tid: Number(p.id), dk }));
+    })
+    .on('POST', '/tenants/:id/restore', async (req, env, a, p) => {
+        if (!env.BACKUP) throw new HttpError(503, 'Penyimpanan backup (R2) belum diaktifkan', 'backup_disabled');
+        const body = await readJson(req, 10000);
+        const t = await env.CORE.prepare('SELECT id, name, do_key FROM tenants WHERE id = ?').bind(p.id).first();
+        if (!t) throw notFound();
+        if (String(body.confirm || '').trim() !== t.name) throw bad('Ketik nama usaha persis untuk konfirmasi pemulihan');
+        const key = String(body.key || '');
+        if (!key.startsWith(`tenant-${t.id}/`)) throw bad('Backup bukan milik tenant ini');
+        const obj = await env.BACKUP.get(key);
+        if (!obj) throw notFound('Berkas backup tidak ditemukan');
+        // Simpan keadaan sekarang dulu, supaya pemulihan bisa dibatalkan
+        const ctx = { kind: 'system', tid: t.id, dk: t.do_key };
+        const stub = tenantStub(env, t.do_key);
+        const now = await callDO(stub, 'GET', '/internal/export-full', null, ctx);
+        const safety = `tenant-${t.id}/sebelum-pulih-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        await env.BACKUP.put(safety, JSON.stringify(now), { httpMetadata: { contentType: 'application/json' } });
+        const res = await stub.fetch(new Request('https://tenant/internal/restore', { method: 'POST', headers: { 'content-type': 'application/json', 'x-rp-ctx': JSON.stringify(ctx) }, body: obj.body }));
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new HttpError(res.status, data.error || 'Pemulihan gagal', data.code || 'restore_failed');
+        await env.CORE.prepare('INSERT INTO subscription_logs (tenant_id, action, detail, by_user, created_at) VALUES (?, ?, ?, ?, ?)')
+            .bind(t.id, 'restore', `Pulihkan dari ${key} (cadangan sebelum pulih: ${safety})`, a.user_id, Date.now()).run();
+        return json({ ok: true, counts: data.counts, safety });
+    })
+    .on('GET', '/system', (req, env) => systemStatus(env))
+    .on('POST', '/system/maintenance', async (req, env) => json(await dailyMaintenance(env)))
     .on('POST', '/tenants/:id/refresh-stats', async (req, env, a, p) => {
         const dk = await doKeyOf(env, p.id);
         await callDO(tenantStub(env, dk), 'POST', '/internal/push-stats', {}, { kind: 'system', tid: Number(p.id), dk });

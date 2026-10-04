@@ -737,6 +737,8 @@
         ['Struk tidak tercetak otomatis', 'Cetak otomatis hanya untuk printer thermal (Web Serial/BLE/RawBT). Dengan Print browser, tekan tombol Cetak.'],
         ['Selisih kas setelah tutup shift', 'Cek Laporan → Audit (kas keluar, buka laci, refund) dan Laporan → Shift. Pastikan semua kas keluar dicatat dengan keterangan.'],
         ['Tanggal laporan terasa "mundur"', 'Transaksi sebelum jam pergantian hari bisnis (default 04:00) masuk ke hari sebelumnya. Ubah di Pengaturan outlet.'],
+        ['Staff tidak bisa login saat offline ("belum bisa login offline")', 'Demi keamanan, setiap staff perlu login sekali saat online (setelah PIN dibuat/diganti atau setelah pembaruan aplikasi). Setelah itu login & persetujuan manager tetap bisa dilakukan saat offline.'],
+        ['Memasukkan banyak menu sekaligus', 'Back Office → Menu & Harga → Impor CSV. Unduh template, isi di Excel (nama, harga, kategori, dst.), simpan sebagai CSV, lalu pilih berkasnya. Periksa pratinjau sebelum menyimpan. Menu dengan SKU/nama sama akan diperbarui.'],
         ['Menu Meja, Layar Dapur, Inventori, atau Promo tidak muncul', 'Fitur itu dinonaktifkan untuk usaha Anda oleh admin RasaPOS (tidak semua usaha membutuhkannya). Hubungi admin RasaPOS untuk mengaktifkan. Tablet menyesuaikan setelah memuat ulang data.'],
         ['Mengganti tablet kasir', 'Pastikan tidak ada data tertunda di tablet lama, Cabut perangkat lama, lalu pasangkan tablet baru dengan kode baru.']
     ];

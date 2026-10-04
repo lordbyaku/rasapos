@@ -23,11 +23,13 @@
     "bindings": [{ "name": "TENANT", "class_name": "TenantDO" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TenantDO"] }],
-  // R2 opsional untuk backup harian. Aktifkan setelah membuat bucket `rasapos-backup`.
+  // Backup harian ke R2 (03:30 WIB, simpan 35 hari). Aktifkan R2 di dashboard, buat bucket `rasapos-backup`, lalu buka komentar ini.
   // "r2_buckets": [{ "binding": "BACKUP", "bucket_name": "rasapos-backup" }],
+  // Email reset password lewat Cloudflare Email Service: onboard domain pengirim, isi MAIL_FROM, lalu buka komentar ini.
+  // "send_email": [{ "name": "EMAIL" }],
   "vars": {
     "APP_NAME": "RasaPOS",
-    "APP_URL": "https://rasapos.haritrisna.workers.dev",
+    "APP_URL": "https://pos.trisna.web.id",
     "SUPERADMIN_EMAILS": "haritrisna@gmail.com,na_grow@yahoo.com",
     "TRIAL_DAYS": "14",
     "GRACE_DAYS": "3",
@@ -39,5 +41,7 @@
     "AI_TENANT_DAILY": "60",
     "AI_DAILY_LIMIT": "900"
   },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // 01:00 UTC = 08:00 WIB: bersihkan log lama & kirim ringkasan error ke superadmin
+  "triggers": { "crons": ["0 1 * * *"] }
 }

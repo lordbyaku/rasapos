@@ -12,7 +12,7 @@ async function call(method, path, body, headers = {}) {
     return data;
 }
 async function loginOrRegister(email, password, reg) {
-    try { return await call('POST', '/auth/login', { email, password }); } catch { return call('POST', '/auth/register', { ...reg, email, password }); }
+    try { return await call('POST', '/auth/login', { email, password }); } catch { return call('POST', '/auth/register', { accept_terms: true, ...reg, email, password }); }
 }
 
 const admin = await loginOrRegister('admin@rasapos.local', 'admin12345', { business_name: 'RasaPOS Admin', owner_name: 'Admin', outlet_name: 'Demo' });

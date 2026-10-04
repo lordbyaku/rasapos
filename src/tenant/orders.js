@@ -5,6 +5,7 @@ import { bad, forbidden, notFound, HttpError, readJson } from '../lib/http.js';
 import { businessDate, localHour } from '../lib/time.js';
 import { parseJson, requireOutlet, requirePerm, can, licenseWritable, actorName, scopeOutlets, staffPerms, features } from './base.js';
 import { getOutlet, channels, paymentMethods, settings, audit, verifyStaffPin, activePromos } from './master.js';
+import { openApprovalProof } from './approval.js';
 
 const { OrderOps, Money, Pricing } = globalThis;
 const OpError = (code, msg) => new OrderOps.OpError(code, msg);
@@ -481,7 +482,7 @@ function applyOrderOp(t, a, op, approval, events) {
     if (next._voided && next._voided.length) {
         const v = next.items.find(i => i.id === next._voided[0]);
         if (v && v.prev_status === 'sent') voidInTickets(t, next, next._voided, events);
-        audit(t, outletId, 'void_item', next.order_no, a, { item: v && v.name, qty: v && v.qty, reason: v && v.void_reason, approved_by: approval ? approval.name : null, was_sent: v && v.prev_status === 'sent' });
+        audit(t, outletId, 'void_item', next.order_no, a, { item: v && v.name, qty: v && v.qty, reason: v && v.void_reason, approved_by: approval ? approval.name : null, approval_offline: approval && approval.offline ? true : undefined, was_sent: v && v.prev_status === 'sent' });
     }
     if (type === 'order.pay') {
         // Item yang langsung dibayar tanpa "kirim dapur" tetap dibuatkan tiket
@@ -492,14 +493,14 @@ function applyOrderOp(t, a, op, approval, events) {
     if (type === 'order.void') {
         const sentBefore = order.items.filter(i => i.status === 'sent').map(i => i.id);
         if (sentBefore.length) voidInTickets(t, next, sentBefore, events);
-        audit(t, outletId, 'void_order', next.order_no, a, { reason: next.void_reason, total: order.totals ? order.totals.total : 0, approved_by: approval ? approval.name : null });
+        audit(t, outletId, 'void_order', next.order_no, a, { reason: next.void_reason, total: order.totals ? order.totals.total : 0, approved_by: approval ? approval.name : null, approval_offline: approval && approval.offline ? true : undefined });
     }
     if (type === 'order.refund') {
         next.refund_shift_id = a.kind === 'device' ? t.db.val("SELECT id FROM shifts WHERE device_id = ? AND status = 'open'", a.device_id) : null;
         const { costByItem } = usageOf(t, next);
         const today = businessDate(now(), outlet.tz_offset_min, outlet.day_cutoff_hour);
         addSales(t, next, -1, today, costByItem);
-        audit(t, outletId, 'refund', next.order_no, a, { reason: next.refund_reason, total: next.totals.total + (next.rounding || 0), approved_by: approval ? approval.name : null });
+        audit(t, outletId, 'refund', next.order_no, a, { reason: next.refund_reason, total: next.totals.total + (next.rounding || 0), approved_by: approval ? approval.name : null, approval_offline: approval && approval.offline ? true : undefined });
     }
     if (type === 'order.print_bill' && next.bill_printed_at && order.bill_printed_at) audit(t, outletId, 'reprint_bill', next.order_no, a, null);
 
@@ -569,18 +570,27 @@ async function resolveApproval(t, a, op, order) {
     const perm = permFor(t, op, order);
     if (!perm || can(a, perm)) return null;
     const ap = op.payload && op.payload.approval;
-    if (op.offline && op.payload && op.payload.approved_by) {
-        const s = t.db.one('SELECT id, name, role, permissions FROM staff WHERE id = ?', Number(op.payload.approved_by));
-        if (!s) throw OpError('approval_invalid', 'Persetujuan offline tidak valid: manager tidak dikenal');
-        if (!staffPerms(s).includes(perm)) throw OpError('approval_invalid', `${s.name} tidak berwenang menyetujui tindakan ini`);
-        return { id: s.id, name: s.name, offline: true };
+    // Bukti terenkripsi dari tablet (operasi offline/tertunda): PIN tetap diverifikasi di server
+    let pin = ap && ap.pin, viaProof = false;
+    if (ap && ap.proof) {
+        let proof;
+        try { proof = await openApprovalProof(t, ap.proof); }
+        catch { throw OpError('approval_invalid', 'Bukti persetujuan tidak valid. Muat ulang data tablet saat online.'); }
+        if (proof.op_id !== op.op_id || proof.staff_id !== Number(ap.staff_id)) throw OpError('approval_invalid', 'Bukti persetujuan tidak cocok dengan transaksi ini');
+        pin = proof.pin; viaProof = true;
+    } else if (op.payload && op.payload.approved_by && !ap) {
+        // Format lama: hanya ID manager tanpa PIN → tidak bisa dibuktikan, ditolak
+        throw OpError('approval_invalid', 'Persetujuan manager tanpa bukti PIN ditolak. Perbarui aplikasi tablet lalu ulangi.');
     }
-    if (!ap || !ap.staff_id || !ap.pin) throw new HttpError(403, 'Butuh persetujuan manager (PIN)', 'approval_required', { perm });
+    if (!ap || !ap.staff_id || !pin) throw new HttpError(403, 'Butuh persetujuan manager (PIN)', 'approval_required', { perm });
     let s;
-    try { s = await verifyStaffPin(t, ap.staff_id, ap.pin, a.kind === 'device' ? a.outlet_id : null); }
-    catch (e) { throw OpError('approval_invalid', 'Persetujuan gagal: ' + e.message); }
+    try { s = await verifyStaffPin(t, ap.staff_id, pin, a.kind === 'device' ? a.outlet_id : null); }
+    catch (e) {
+        if (e.code === 'pin_locked') throw e; // sementara: tablet mencoba lagi nanti
+        throw OpError('approval_invalid', 'Persetujuan gagal: ' + e.message);
+    }
     if (!s.perms.includes(perm)) throw OpError('approval_invalid', `${s.name} tidak punya izin untuk menyetujui tindakan ini`);
-    return { id: s.id, name: s.name };
+    return { id: s.id, name: s.name, offline: !!op.offline, proof: viaProof };
 }
 
 function applyOp(t, a, op, approval, events) {

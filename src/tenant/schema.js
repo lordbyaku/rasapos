@@ -301,6 +301,10 @@ export const MIGRATIONS = [
     CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY, mime TEXT NOT NULL, data BLOB NOT NULL, created_at INTEGER NOT NULL) WITHOUT ROWID;
 
     CREATE TABLE IF NOT EXISTS revoked_devices (device_id TEXT PRIMARY KEY, revoked_at INTEGER NOT NULL) WITHOUT ROWID;
+    `,
+    // v2 — verifier PIN khusus tablet (terpisah dari hash server) untuk login/persetujuan offline
+    `
+    ALTER TABLE staff ADD COLUMN pin_check TEXT;
     `
 ];
 
