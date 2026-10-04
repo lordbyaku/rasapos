@@ -54,9 +54,7 @@ npm run scenarios
 Domain produksi: **https://pos.trisna.web.id** (Workers custom domain; `*.workers.dev` tetap aktif).
 
 ## Backup & pemulihan
-1. Dashboard Cloudflare → **R2** → aktifkan R2 (tier gratis 10 GB; Cloudflare meminta metode pembayaran untuk aktivasi).
-2. `npx wrangler r2 bucket create rasapos-backup`
-3. Buka komentar `r2_buckets` di `wrangler.jsonc`, commit & push.
+**Status: aktif** (bucket `rasapos-backup`, dibuat 4 Okt 2026). Untuk instalasi baru: aktifkan R2 di dashboard → `npx wrangler r2 bucket create rasapos-backup` → binding `r2_buckets` di `wrangler.jsonc`.
 
 Setelah aktif: backup otomatis tiap tenant setiap malam 03:30 WIB (`tenant-<id>/<tanggal>.json`, disimpan 35 hari) berisi semua data termasuk hash PIN, kunci persetujuan, dan foto menu.
 Superadmin → klik tenant → **Backup**: "Backup sekarang" dan **Pulihkan** (ketik nama usaha untuk konfirmasi; keadaan sebelum pulih dicadangkan otomatis).

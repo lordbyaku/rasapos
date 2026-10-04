@@ -23,8 +23,8 @@
     "bindings": [{ "name": "TENANT", "class_name": "TenantDO" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TenantDO"] }],
-  // Backup harian ke R2 (03:30 WIB, simpan 35 hari). Aktifkan R2 di dashboard, buat bucket `rasapos-backup`, lalu buka komentar ini.
-  // "r2_buckets": [{ "binding": "BACKUP", "bucket_name": "rasapos-backup" }],
+  // Backup harian ke R2 (03:30 WIB, simpan 35 hari)
+  "r2_buckets": [{ "binding": "BACKUP", "bucket_name": "rasapos-backup" }],
   // Email reset password lewat Cloudflare Email Service: onboard domain pengirim, isi MAIL_FROM, lalu buka komentar ini.
   // "send_email": [{ "name": "EMAIL" }],
   "vars": {
