@@ -7,3 +7,4 @@ public/css/app.css
 *.log
 .wrangler-dev.log
 .claude/
+.demo-*.md

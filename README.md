@@ -78,6 +78,9 @@ Superadmin → **Sistem**: error server 24 jam/7 hari, endpoint yang paling seri
 ## Legal
 `/syarat.html` dan `/privasi.html` (draf). Lengkapi bagian `[dalam kurung siku]` dan minta tinjauan ahli hukum. Pendaftar wajib mencentang persetujuan; versinya dicatat (`TERMS_VERSION` di `src/auth.js`).
 
+## Tenant demo
+`node scripts/demo-burger.mjs <URL> --email <email-owner> [--days 14] [--activate wrangler|admin]` membuat tenant **Burger Mantul** (Jogja, Solo, Semarang) lengkap: menu & varian, resep & stok, promo, member, staff, riwayat ±14 hari (tutup hari, void, refund), serta kondisi hari ini (shift buka, meja terisi, tiket dapur). Kredensial ditulis ke `.demo-burger-mantul.md` (diabaikan git).
+
 ## Impor menu
 Back Office → Menu & Harga → **Impor CSV** (template tersedia). Kolom: nama, harga, kategori, stasiun, sku, deskripsi, pajak. Pratinjau dulu; SKU/nama sama → diperbarui; kategori baru dibuat otomatis; maks. 1000 baris.
 
