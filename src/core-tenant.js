@@ -2,7 +2,7 @@
 import { Router, json, readJson, bad, forbidden, notFound } from './lib/http.js';
 import { hashSecret, randomDigits, randomToken } from './lib/crypto.js';
 import { pick, isEmail } from './lib/validate.js';
-import { licenseOf } from './license.js';
+import { licenseOf, tenantFeatures } from './license.js';
 import { getTenant } from './auth.js';
 import { tenantStub, callDO } from './do-client.js';
 import '../public/js/shared/features.js';
@@ -24,7 +24,7 @@ export const coreTenantRouter = new Router()
         if (!inScope(a, d.outlet_id)) throw forbidden();
         if (d.type === 'kds') {
             const t = await getTenant(env, a.tid);
-            if (!globalThis.Features.resolve(t && t.features).kds) throw forbidden('Fitur Layar Dapur (KDS) tidak aktif untuk usaha ini. Hubungi admin RasaPOS.', 'feature_disabled');
+            if (!tenantFeatures(t, env).kds) throw forbidden('Fitur Layar Dapur (KDS) tidak aktif untuk usaha ini. Hubungi admin RasaPOS.', 'feature_disabled');
         }
         // Pastikan outlet milik tenant & aktif
         await callDO(tenantStub(env, a.dk), 'GET', `/internal/outlet/${d.outlet_id}`, null, { kind: 'system', tid: a.tid, dk: a.dk });

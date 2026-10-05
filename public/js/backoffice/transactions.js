@@ -76,7 +76,7 @@ BO.page('transactions', {
         $('#tx-status').onchange = e => { s.status = e.target.value; s.page = 1; this.load(); };
         $('#tx-channel').onchange = e => { s.channel = e.target.value; s.page = 1; this.load(); };
         $('#tx-export').onclick = () => this.export();
-        BO.on('sale.new', debounce(() => this.load(), 2000));
+        BO.on('sale.new', BO.live(() => this.load(), 30000));
         await this.load();
     },
     params(extra) {

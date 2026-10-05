@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.5.0] — 2026-10-05
+
+### Baru
+- **Paket Basic / Pro otomatis.** Kolom `plan` per tenant (migrasi `0006`). Basic menonaktifkan Layar Dapur (KDS) & Inventori; Pro semua fitur; masa trial selalu semua fitur. Fitur berlaku = pengaturan manual superadmin **dan** batas paket, ditegakkan di server, dihitung ulang tiap malam (mis. saat trial berakhir).
+- Superadmin: pilih paket saat perpanjang dengan **hitung tagihan otomatis** (bulanan/tahunan × jumlah paket, tercatat di riwayat), tombol "Ubah ke Basic/Pro", lencana paket di daftar tenant, fitur di luar paket dikunci ("Paket Pro"). Back Office menampilkan paket & ajakan upgrade.
+- `scripts/capacity.mjs`: simulasi kapasitas & proyeksi kuota Cloudflare.
+
+### Perbaikan bottleneck (ditemukan simulasi kapasitas)
+- **Backup, pemulihan & ekspor dialirkan** (NDJSON, unggahan multipart R2, paginasi keyset). Sebelumnya seluruh data dijadikan satu teks di memori → backup tenant besar akan gagal setelah ±1–2 bulan (batas memori 128 MB). Backup lama (v1) tetap bisa dipulihkan.
+- **Dashboard & daftar transaksi** tidak lagi dimuat ulang setiap penjualan: paling sering tiap 60/30 detik dan hanya saat tab terlihat. "Transaksi terakhir" per outlet dari cache (sebelumnya membaca semua order 7 hari tiap muat). Pada outlet ramai ini mencegah jutaan baris dibaca per hari.
+- **Daftar transaksi** memakai halaman di database (LIMIT/OFFSET + COUNT), tidak memuat seluruh rentang tanggal.
+- **Pairing tablet**: batas percobaan hanya menghitung kode yang salah — memasangkan banyak tablet sekaligus dari satu lokasi tidak lagi terblokir.
+- Paket Basic: meminta aktifkan KDS/Inventori sekarang ditolak dengan jelas (sebelumnya diam-diam "tanpa perubahan").
+
+### Pengujian
+- Skenario P1–P2 (paket); total 104 skenario lulus; uji unit backup streaming 30 MB (multipart) + pemulihan; simulasi kapasitas 10 outlet × 100 transaksi bersamaan: 0 error.
+
 ## [1.4.0] — 2026-10-04
 
 Perbaikan tahap 1 dari audit kelayakan jual.

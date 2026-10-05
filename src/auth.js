@@ -25,6 +25,12 @@ export async function rateLimit(env, key, max, windowSec) {
     await env.CORE.prepare('UPDATE login_attempts SET count = count + 1 WHERE key = ?').bind(key).run();
 }
 
+/** Tolak bila batas percobaan sudah tercapai, tanpa menambah hitungan */
+async function rateBlocked(env, key, max, windowSec) {
+    const row = await env.CORE.prepare('SELECT count, window_start FROM login_attempts WHERE key = ?').bind(key).first();
+    if (row && Date.now() - row.window_start <= windowSec * 1000 && row.count >= max) throw new HttpError(429, 'Terlalu banyak percobaan. Coba lagi beberapa menit lagi.', 'rate_limited');
+}
+
 const clearRate = (env, key) => env.CORE.prepare('DELETE FROM login_attempts WHERE key = ?').bind(key).run();
 const clientIp = req => req.headers.get('cf-connecting-ip') || 'local';
 
@@ -216,10 +222,15 @@ export const authRouter = new Router()
     // Pairing perangkat outlet dengan kode 6 digit dari back office
     .on('POST', '/pair', async (req, env) => {
         const { code } = await readJson(req);
-        await rateLimit(env, 'pair:' + clientIp(req), 10, 900);
+        // Hanya kode SALAH yang dihitung (cegah tebak kode); memasangkan banyak tablet sekaligus dari satu lokasi tetap bisa
+        const key = 'pair:' + clientIp(req);
+        await rateBlocked(env, key, 10, 900);
         const c = String(code || '').replace(/\D/g, '');
         const row = c.length === 6 ? await env.CORE.prepare('SELECT * FROM pair_codes WHERE code = ?').bind(c).first() : null;
-        if (!row || row.used_at || row.expires_at < Date.now()) throw bad('Kode pairing salah atau sudah kedaluwarsa', 'pair_invalid');
+        if (!row || row.used_at || row.expires_at < Date.now()) {
+            await rateLimit(env, key, 10, 900);
+            throw bad('Kode pairing salah atau sudah kedaluwarsa', 'pair_invalid');
+        }
         const tenant = await getTenant(env, row.tenant_id);
         const count = await env.CORE.prepare('SELECT COUNT(*) AS n FROM devices WHERE tenant_id = ? AND outlet_id = ?').bind(row.tenant_id, row.outlet_id).first();
         const n = count.n;

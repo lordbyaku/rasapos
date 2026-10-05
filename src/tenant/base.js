@@ -4,8 +4,15 @@ import { ROLE_PERMS } from './schema.js';
 
 /** Pembungkus SQLite Durable Object. */
 export class DB {
-    constructor(sql) { this.sql = sql; }
-    exec(q, ...p) { return this.sql.exec(q, ...p.map(v => (v === undefined ? null : typeof v === 'boolean' ? (v ? 1 : 0) : v))); }
+    constructor(sql) { this.sql = sql; this.cursors = null; }
+    exec(q, ...p) {
+        const c = this.sql.exec(q, ...p.map(v => (v === undefined ? null : typeof v === 'boolean' ? (v ? 1 : 0) : v)));
+        if (this.cursors) this.cursors.push(c); // pengukuran (DEBUG_METRICS)
+        return c;
+    }
+    /** Hitung baris dibaca/ditulis sejak track() (dipakai simulasi kapasitas) */
+    track() { this.cursors = []; }
+    usage() { const u = { read: 0, written: 0 }; for (const c of this.cursors || []) { u.read += c.rowsRead; u.written += c.rowsWritten; } this.cursors = null; return u; }
     all(q, ...p) { return this.exec(q, ...p).toArray(); }
     one(q, ...p) { return this.all(q, ...p)[0] || null; }
     val(q, ...p) { const r = this.one(q, ...p); return r ? Object.values(r)[0] : null; }

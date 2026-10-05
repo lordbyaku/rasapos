@@ -1,7 +1,7 @@
 // Panel superadmin: kelola tenant, paket & masa aktif (pengganti WEB APP MANAGEMENT).
 import { Router, json, readJson, bad, notFound, HttpError } from './lib/http.js';
 import { hashSecret, randomToken } from './lib/crypto.js';
-import { licenseOf } from './license.js';
+import { licenseOf, tenantFeatures } from './license.js';
 import { addDays } from './lib/time.js';
 import { tenantStub, callDO, doKeyOf } from './do-client.js';
 import '../public/js/shared/features.js';
@@ -9,6 +9,13 @@ import { systemStatus, dailyMaintenance } from './monitor.js';
 import { MAX_KEYS, getSettings, saveSettings, encryptKey, hintOf, testKey, decryptText, KEY_PURPOSE } from './ai-keys.js';
 
 const DAY = 86400000;
+
+/** Kirim fitur yang berlaku (pengaturan + paket + status lisensi) ke penyimpanan tenant (penegak aturan). */
+async function syncFeatures(env, tenant) {
+    const feats = tenantFeatures(tenant, env);
+    await callDO(tenantStub(env, tenant.do_key), 'POST', '/internal/features', { features: feats }, { kind: 'system', tid: tenant.id, dk: tenant.do_key });
+    return feats;
+}
 
 export const adminRouter = new Router()
     .on('GET', '/overview', async (req, env) => {
@@ -24,7 +31,7 @@ export const adminRouter = new Router()
         const owners = await env.CORE.prepare("SELECT tenant_id, email, name FROM users WHERE role = 'owner'").all();
         const o = by(owners);
         const list = tenants.results.map(t => ({
-            ...t, license: licenseOf(t, env), owner: o[t.id] || null, features: globalThis.Features.resolve(t.features),
+            ...t, license: licenseOf(t, env), owner: o[t.id] || null, features: tenantFeatures(t, env), features_manual: globalThis.Features.resolve(t.features),
             users: u[t.id]?.n || 0, devices: d[t.id]?.active || 0,
             trx_30d: s[t.id]?.trx || 0, sales_30d: s[t.id]?.sales || 0, outlets: s[t.id]?.outlets || 0, last_stat: s[t.id]?.last_date || null
         }));
@@ -43,16 +50,24 @@ export const adminRouter = new Router()
             env.CORE.prepare('SELECT * FROM subscription_logs WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 50').bind(t.id).all(),
             env.CORE.prepare('SELECT * FROM tenant_stats WHERE tenant_id = ? ORDER BY date DESC LIMIT 30').bind(t.id).all()
         ]);
-        return json({ tenant: { ...t, license: licenseOf(t, env), features: globalThis.Features.resolve(t.features) }, users: users.results, devices: devices.results, logs: logs.results, stats: stats.results });
+        return json({ tenant: { ...t, license: licenseOf(t, env), features: tenantFeatures(t, env), features_manual: globalThis.Features.resolve(t.features) }, users: users.results, devices: devices.results, logs: logs.results, stats: stats.results });
     })
     .on('POST', '/tenants/:id/subscription', async (req, env, a, p) => {
         const body = await readJson(req);
         const t = await env.CORE.prepare('SELECT * FROM tenants WHERE id = ?').bind(p.id).first();
         if (!t) throw notFound();
         const now = Date.now();
-        let { status, paid_until, outlet_packs, trial_ends_at } = t;
+        let { status, paid_until, outlet_packs, trial_ends_at, plan } = t;
         const notes = [];
-        if (body.action === 'extend') {
+        const P = globalThis.Features.PLANS;
+        if (body.plan !== undefined) {
+            if (!P[body.plan]) throw bad('Paket tidak dikenal');
+            if (body.plan !== plan) notes.push(`Paket ${P[plan] ? P[plan].label : plan} → ${P[body.plan].label}`);
+            plan = body.plan;
+        }
+        if (body.action === 'plan') {
+            if (body.plan === undefined) throw bad('Pilih paket');
+        } else if (body.action === 'extend') {
             const months = Math.round(Number(body.months || 1));
             if (months < 1 || months > 36) throw bad('Jumlah bulan 1–36');
             const from = Math.max(paid_until || 0, now);
@@ -60,7 +75,8 @@ export const adminRouter = new Router()
             paid_until = d.getTime(); status = 'active';
             if (body.packs) outlet_packs = Math.max(1, Math.round(Number(body.packs)));
             if (!outlet_packs) outlet_packs = 1;
-            notes.push(`Perpanjang ${months} bulan s/d ${new Date(paid_until).toISOString().slice(0, 10)}, ${outlet_packs} paket`);
+            const amount = globalThis.Features.price(plan, outlet_packs, months);
+            notes.push(`Perpanjang ${months} bulan s/d ${new Date(paid_until).toISOString().slice(0, 10)}, ${outlet_packs} paket ${P[plan].label} (Rp ${amount.toLocaleString('id-ID')})`);
         } else if (body.action === 'packs') {
             outlet_packs = Math.max(0, Math.round(Number(body.packs)));
             notes.push(`Jumlah paket → ${outlet_packs}`);
@@ -75,36 +91,36 @@ export const adminRouter = new Router()
         } else throw bad('Aksi tidak dikenal');
 
         await env.CORE.batch([
-            env.CORE.prepare('UPDATE tenants SET status = ?, paid_until = ?, outlet_packs = ?, trial_ends_at = ? WHERE id = ?').bind(status, paid_until, outlet_packs, trial_ends_at, t.id),
-            env.CORE.prepare('INSERT INTO subscription_logs (tenant_id, action, detail, by_user, created_at) VALUES (?, ?, ?, ?, ?)').bind(t.id, body.action, notes.join('; '), a.user_id, now)
+            env.CORE.prepare('UPDATE tenants SET status = ?, paid_until = ?, outlet_packs = ?, trial_ends_at = ?, plan = ? WHERE id = ?').bind(status, paid_until, outlet_packs, trial_ends_at, plan, t.id),
+            env.CORE.prepare('INSERT INTO subscription_logs (tenant_id, action, detail, by_user, created_at) VALUES (?, ?, ?, ?, ?)').bind(t.id, body.action, notes.join('; ') || 'Tanpa perubahan', a.user_id, now)
         ]);
         const nt = await env.CORE.prepare('SELECT * FROM tenants WHERE id = ?').bind(t.id).first();
-        return json({ tenant: { ...nt, license: licenseOf(nt, env) } });
+        // Paket/status berubah → fitur yang berlaku di tenant ikut berubah
+        const feats = await syncFeatures(env, nt);
+        return json({ tenant: { ...nt, license: licenseOf(nt, env), features: feats } });
     })
     .on('PUT', '/tenants/:id/features', async (req, env, a, p) => {
         const F = globalThis.Features;
-        const t = await env.CORE.prepare('SELECT id, do_key, features FROM tenants WHERE id = ?').bind(p.id).first();
+        const t = await env.CORE.prepare('SELECT * FROM tenants WHERE id = ?').bind(p.id).first();
         if (!t) throw notFound();
         const body = await readJson(req, 10000);
         const before = F.resolve(t.features);
         const next = F.resolve({ ...before, ...F.sanitize(body.features) });
+        const lic = licenseOf(t, env);
+        // Meminta fitur yang tidak termasuk paket → tolak dengan jelas (bukan diam-diam tidak berubah)
+        const asked = F.sanitize(body.features);
+        const blocked = F.planOf(lic.plan).excludes.filter(k => asked[k] === true);
+        if (blocked.length && lic.state !== 'trial') throw bad(`${blocked.map(k => F.LIST.find(f => f.key === k).label).join(' & ')} hanya tersedia di paket Pro. Ubah paket tenant ke Pro terlebih dahulu.`, 'plan_required');
         const changes = F.LIST.filter(f => before[f.key] !== next[f.key]).map(f => `${f.label} ${next[f.key] ? 'aktif' : 'nonaktif'}`);
-        if (!changes.length) return json({ features: next });
-        // Simpan hanya yang dimatikan: fitur baru di masa depan otomatis aktif
+        if (!changes.length) return json({ features: tenantFeatures(t, env) });
+        // D1 = sumber kebenaran (pengaturan manual); hanya yang dimatikan disimpan → fitur baru otomatis aktif
         const stored = Object.fromEntries(F.KEYS.filter(k => !next[k]).map(k => [k, false]));
-        // DO dulu (penegak aturan), baru D1 (cermin untuk panel)
-        await callDO(tenantStub(env, t.do_key), 'POST', '/internal/features', { features: stored }, { kind: 'system', tid: t.id, dk: t.do_key });
-        try {
-            await env.CORE.batch([
-                env.CORE.prepare('UPDATE tenants SET features = ? WHERE id = ?').bind(Object.keys(stored).length ? JSON.stringify(stored) : null, t.id),
-                env.CORE.prepare('INSERT INTO subscription_logs (tenant_id, action, detail, by_user, created_at) VALUES (?, ?, ?, ?, ?)').bind(t.id, 'features', 'Fitur: ' + changes.join(', '), a.user_id, Date.now())
-            ]);
-        } catch (e) {
-            // Sudah berlaku di tenant; hanya catatan panel yang gagal (diselaraskan ulang otomatis tiap malam)
-            console.error('features D1', e);
-            throw new HttpError(500, 'Fitur sudah berlaku di tenant, tetapi gagal dicatat di panel. Simpan ulang untuk menyelaraskan.', 'features_log_failed');
-        }
-        return json({ features: next });
+        const nt = { ...t, features: Object.keys(stored).length ? JSON.stringify(stored) : null };
+        await env.CORE.batch([
+            env.CORE.prepare('UPDATE tenants SET features = ? WHERE id = ?').bind(nt.features, t.id),
+            env.CORE.prepare('INSERT INTO subscription_logs (tenant_id, action, detail, by_user, created_at) VALUES (?, ?, ?, ?, ?)').bind(t.id, 'features', 'Fitur: ' + changes.join(', '), a.user_id, Date.now())
+        ]);
+        return json({ features: await syncFeatures(env, nt) });
     })
     .on('GET', '/tenants/:id/backups', async (req, env, a, p) => {
         if (!env.BACKUP) return json({ enabled: false, items: [] });
@@ -128,9 +144,8 @@ export const adminRouter = new Router()
         // Simpan keadaan sekarang dulu, supaya pemulihan bisa dibatalkan
         const ctx = { kind: 'system', tid: t.id, dk: t.do_key };
         const stub = tenantStub(env, t.do_key);
-        const now = await callDO(stub, 'GET', '/internal/export-full', null, ctx);
-        const safety = `tenant-${t.id}/sebelum-pulih-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-        await env.BACKUP.put(safety, JSON.stringify(now), { httpMetadata: { contentType: 'application/json' } });
+        const safety = `tenant-${t.id}/sebelum-pulih-${new Date().toISOString().replace(/[:.]/g, '-')}.ndjson`;
+        await callDO(stub, 'POST', '/internal/backup', { key: safety }, ctx);
         const res = await stub.fetch(new Request('https://tenant/internal/restore', { method: 'POST', headers: { 'content-type': 'application/json', 'x-rp-ctx': JSON.stringify(ctx) }, body: obj.body }));
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new HttpError(res.status, data.error || 'Pemulihan gagal', data.code || 'restore_failed');

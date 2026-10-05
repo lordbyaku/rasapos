@@ -27,5 +27,26 @@
         return out;
     }
 
-    root.Features = { LIST, KEYS, resolve, sanitize };
+    /** Paket langganan (harga per paket = maks. 5 outlet). Trial memakai semua fitur. */
+    const PLANS = {
+        basic: { key: 'basic', label: 'Basic', monthly: 100000, yearly: 1000000, excludes: ['kds', 'inventory'] },
+        pro: { key: 'pro', label: 'Pro', monthly: 200000, yearly: 2000000, excludes: [] }
+    };
+    const planOf = p => PLANS[p] || PLANS.pro;
+
+    /** Fitur yang berlaku = pengaturan manual superadmin DAN yang termasuk paket (kecuali masa trial). */
+    function effective(stored, plan, licenseState) {
+        const out = resolve(stored);
+        if (licenseState !== 'trial') for (const k of planOf(plan).excludes) out[k] = false;
+        return out;
+    }
+
+    /** Harga: paket × (12 bulan = harga tahunan, selain itu harga bulanan × bulan) */
+    function price(plan, packs, months) {
+        const p = planOf(plan);
+        const m = Math.max(1, Number(months) || 1), n = Math.max(1, Number(packs) || 1);
+        return n * (Math.floor(m / 12) * p.yearly + (m % 12) * p.monthly);
+    }
+
+    root.Features = { LIST, KEYS, PLANS, planOf, resolve, sanitize, effective, price };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -116,8 +116,20 @@ Tombol **Tanya Panduan** di `/tutorial.html` menjawab pertanyaan dari isi pandua
 ## Offline
 Transaksi, kirim dapur, bayar, dan shift tetap bisa saat internet putus; data disimpan di tablet dan dikirim otomatis saat online. Pindah/gabung/split bill, refund, tutup shift & tutup hari butuh online. Jangan hapus data browser selama header menampilkan "tertunda".
 
-## Kuota Cloudflare Free (perkiraan)
-100 rb baris tulis/hari ≈ ±24 outlet aktif. Upgrade **Workers Paid ($5/bln)** sebelum ±15 outlet.
+## Kapasitas & kuota Cloudflare (hasil `scripts/capacity.mjs`)
+Diukur dengan alur tablet asli (1 request per aksi kasir, layar dapur, back office), `DEBUG_METRICS=1` di `.dev.vars`:
+per transaksi ±8,3 request, ±10 baris ditulis, ±150 baris dibaca. Proyeksi **3 tenant × 10 outlet × 100 trx/hari**:
+
+| Kuota Free (per hari) | Pemakaian | |
+|---|---|---|
+| Worker requests 100.000 | ±31.000 | 31% |
+| Durable Object requests 100.000 | ±37.000 | 37% |
+| Baris ditulis 100.000 | ±30.000 (bisa ±2× bila indeks dihitung) | 30–60% |
+| Baris dibaca 5.000.000 | 1,0 jt (hari 1) → ±5 jt (±1 tahun, karena backup harian membaca semua data) | 21% → 100% |
+
+Di paket Free, melewati satu batas = operasi **gagal** sampai 07:00 WIB. Rekomendasi: **Workers Paid ($5/bln)** saat tenant berbayar pertama;
+kebutuhan skenario di atas (±0,9 jt req Worker, ±1,1 jt req DO, ±0,9 jt baris tulis per bulan) masih di dalam kuota Paid (± $5,02/bln).
+Satu tenant = satu Durable Object: simulasi 10 outlet bersamaan memproses ±105 request/detik tanpa error (kebutuhan puncak ±1 request/detik).
 
 ## Update aplikasi
 Push ke branch `main` → Cloudflare otomatis build & deploy. **Jika ada file baru di `migrations/`, jalankan dulu sebelum push:**

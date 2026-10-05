@@ -116,5 +116,6 @@ function licenseText(l) {
     const s = l.state || l.s;
     const until = l.until || l.u;
     const map = { trial: 'Trial', active: 'Aktif', grace: 'Masa tenggang', expired: 'Kedaluwarsa', suspended: 'Ditangguhkan' };
-    return `${map[s] || s}${until ? ' s/d ' + fmtDate(until) : ''}`;
+    const plan = { basic: 'Basic', pro: 'Pro' }[l.plan || l.p];
+    return `${plan && s !== 'trial' ? 'Paket ' + plan + ' · ' : ''}${map[s] || s}${until ? ' s/d ' + fmtDate(until) : ''}`;
 }

@@ -5,6 +5,16 @@ import { requirePerm, scopeOutlets, parseJson } from './base.js';
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Ambil rentang tanggal & daftar outlet (dibatasi hak akses). */
+/** Waktu penjualan terakhir outlet (cache memori Durable Object). */
+export function lastSaleOf(t, outletId) {
+    t.lastSale ||= new Map();
+    if (!t.lastSale.has(outletId)) {
+        const bd = t.db.val("SELECT business_date FROM orders WHERE outlet_id = ? ORDER BY business_date DESC LIMIT 1", outletId);
+        t.lastSale.set(outletId, bd ? t.db.val("SELECT MAX(closed_at) FROM orders WHERE outlet_id = ? AND business_date = ? AND status = 'paid'", outletId, bd) : null);
+    }
+    return t.lastSale.get(outletId);
+}
+
 function range(t, a, url) {
     requirePerm(a, 'reports');
     const today = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
@@ -44,7 +54,9 @@ export function registerReports(router) {
         const prevTo = addDays(r.from, -1), prevFrom = addDays(r.from, -days);
         const byOutlet = t.db.all(`SELECT outlet_id, ${sumSql} FROM sales_daily WHERE outlet_id IN (${r.ph}) AND business_date BETWEEN ? AND ? GROUP BY outlet_id`, ...r.ids, r.from, r.to);
         const live = t.db.all(`SELECT outlet_id, COUNT(*) AS open_orders, COALESCE(SUM(total),0) AS open_total FROM orders WHERE status = 'open' AND outlet_id IN (${r.ph}) GROUP BY outlet_id`, ...r.ids);
-        const lastSale = t.db.all(`SELECT outlet_id, MAX(closed_at) AS last_sale FROM orders WHERE status = 'paid' AND outlet_id IN (${r.ph}) AND business_date >= ? GROUP BY outlet_id`, ...r.ids, addDays(r.to, -7));
+        // Transaksi terakhir: cache memori (diisi saat bayar); bila kosong cukup baca hari bisnis terakhir per outlet
+        // (sebelumnya membaca semua order 7 hari pada setiap muat dashboard)
+        const lastSale = r.ids.map(id => ({ outlet_id: id, last_sale: lastSaleOf(t, id) }));
         const shifts = t.db.all(`SELECT outlet_id, COUNT(*) AS n, GROUP_CONCAT(staff_name, ', ') AS staff FROM shifts WHERE status = 'open' AND outlet_id IN (${r.ph}) GROUP BY outlet_id`, ...r.ids);
         const by = (rows) => Object.fromEntries(rows.map(x => [x.outlet_id, x]));
         const bo = by(byOutlet), lv = by(live), ls = by(lastSale), sh = by(shifts);
@@ -74,13 +86,19 @@ export function registerReports(router) {
         const q = (url.searchParams.get('q') || '').trim().toLowerCase();
         const page = Math.max(1, Number(url.searchParams.get('page') || 1));
         const all = url.searchParams.get('all') === '1';
-        let sql = `SELECT data FROM orders WHERE outlet_id IN (${r.ph}) AND business_date BETWEEN ? AND ?`;
+        // Filter & halaman dikerjakan database (tidak memuat seluruh rentang tanggal ke memori)
+        let where = `outlet_id IN (${r.ph}) AND business_date BETWEEN ? AND ?`;
         const args = [...r.ids, r.from, r.to];
-        if (status) { sql += ' AND status = ?'; args.push(status); } else sql += " AND status != 'merged'";
-        if (channel) { sql += ' AND channel = ?'; args.push(channel); }
-        sql += ' ORDER BY COALESCE(closed_at, opened_at) DESC';
-        let rows = t.db.all(sql, ...args).map(x => JSON.parse(x.data));
-        if (q) rows = rows.filter(o => o.order_no.toLowerCase().includes(q) || String(o.customer_name || '').toLowerCase().includes(q) || String(o.table_name || '').toLowerCase().includes(q));
+        if (status) { where += ' AND status = ?'; args.push(status); } else where += " AND status != 'merged'";
+        if (channel) { where += ' AND channel = ?'; args.push(channel); }
+        if (q) {
+            where += " AND (lower(order_no) LIKE ? OR lower(COALESCE(json_extract(data, '$.customer_name'), '')) LIKE ? OR lower(COALESCE(json_extract(data, '$.table_name'), '')) LIKE ?)";
+            args.push(`%${q}%`, `%${q}%`, `%${q}%`);
+        }
+        const per = 50;
+        const totalRows = Number(t.db.val(`SELECT COUNT(*) FROM orders WHERE ${where}`, ...args));
+        const limit = all ? 5000 : per, offset = all ? 0 : (page - 1) * per;
+        const rows = t.db.all(`SELECT data FROM orders WHERE ${where} ORDER BY COALESCE(closed_at, opened_at) DESC LIMIT ${limit} OFFSET ${offset}`, ...args).map(x => JSON.parse(x.data));
         const staff = Object.fromEntries(t.db.all('SELECT id, name FROM staff').map(s => [s.id, s.name]));
         const mapped = rows.map(o => ({
             id: o.id, order_no: o.order_no, outlet_id: o.outlet_id, business_date: o.business_date, type: o.type, channel: o.channel,
@@ -92,8 +110,7 @@ export function registerReports(router) {
             staff: staff[o.closed_by || o.staff_id] || '', opened_at: o.opened_at, closed_at: o.closed_at, offline: !!o.offline,
             voids: o.items.filter(i => i.status === 'void').length
         }));
-        const per = 50;
-        return { total_rows: mapped.length, page, per_page: per, items: all ? mapped.slice(0, 5000) : mapped.slice((page - 1) * per, page * per) };
+        return { total_rows: totalRows, page, per_page: per, items: mapped };
     });
 
     router.on('GET', '/reports/items', (t, req, a, p, url) => {

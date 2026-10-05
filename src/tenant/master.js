@@ -5,6 +5,7 @@ import { signJwt } from '../lib/jwt.js';
 import { businessDate } from '../lib/time.js';
 import { parseJson, requirePerm, requireOutlet, outletInScope, scopeOutlets, isOwner, staffPerms, actorName, can, features, requireFeature } from './base.js';
 import { approvalPublicKey } from './approval.js';
+import { exportStream } from './backup.js';
 import { DEFAULT_CHANNELS, DEFAULT_PAYMENT_METHODS, DEFAULT_SETTINGS, ROLE_PERMS, ALL_STAFF_PERMS } from './schema.js';
 
 const PIN_ITER = 10000;
@@ -245,6 +246,29 @@ function registerCrud(router, name, res) {
         }
         return { ok: true };
     });
+}
+
+/**
+ * Simpan fitur yang berlaku (objek lengkap {kds: bool, ...}) ke penyimpanan tenant.
+ * Selama inventori nonaktif penjualan tidak memotong stok → ingatkan stock opname saat diaktifkan lagi.
+ */
+export function applyFeatures(t, full) {
+    const F = globalThis.Features;
+    const before = features(t);
+    const target = F.resolve(F.sanitize(full));
+    const stored = Object.fromEntries(F.KEYS.filter(k => !target[k]).map(k => [k, false]));
+    t.db.setMeta('features', stored);
+    const after = features(t);
+    if (before.inventory && !after.inventory) t.db.setMeta('inventory_paused_at', now());
+    if (!before.inventory && after.inventory) {
+        const from = t.db.getMeta('inventory_paused_at');
+        if (from) {
+            const prev = t.db.getMeta('inventory_gap');
+            t.db.setMeta('inventory_gap', { from: prev ? prev.from : from, to: now() });
+            t.db.exec("DELETE FROM meta WHERE key = 'inventory_paused_at'");
+        }
+    }
+    return after;
 }
 
 // ---------------------------------------------------------------- bootstrap perangkat
@@ -494,22 +518,7 @@ export function registerMaster(router) {
         return { ok: true };
     }, { internal: true });
 
-    router.on('POST', '/internal/features', async (t, req) => {
-        const before = features(t);
-        t.db.setMeta('features', globalThis.Features.sanitize((await req.json()).features));
-        const after = features(t);
-        // Selama inventori nonaktif penjualan tidak memotong stok → ingatkan stock opname saat diaktifkan lagi
-        if (before.inventory && !after.inventory) t.db.setMeta('inventory_paused_at', now());
-        if (!before.inventory && after.inventory) {
-            const from = t.db.getMeta('inventory_paused_at');
-            if (from) {
-                const prev = t.db.getMeta('inventory_gap');
-                t.db.setMeta('inventory_gap', { from: prev ? prev.from : from, to: now() });
-                t.db.exec("DELETE FROM meta WHERE key = 'inventory_paused_at'");
-            }
-        }
-        return { features: after };
-    }, { internal: true });
+    router.on('POST', '/internal/features', async (t, req) => ({ features: applyFeatures(t, (await req.json()).features) }), { internal: true });
 
     // Meta back office
     router.on('GET', '/meta', (t, req, a) => {
@@ -717,10 +726,10 @@ export function registerMaster(router) {
     }, { public: true });
 
     // Ekspor seluruh data tenant (backup)
-    router.on('GET', '/internal/export-full', t => exportAll(t, { secrets: true }), { internal: true });
     router.on('GET', '/export', (t, req, a) => {
         if (!isOwner(a)) throw forbidden('Hanya pemilik yang dapat mengekspor data');
-        return new Response(JSON.stringify(exportAll(t)), {
+        // Dialirkan per bagian: aman untuk data besar (tanpa memuat semuanya ke memori)
+        return new Response(exportStream(t), {
             headers: { 'content-type': 'application/json', 'content-disposition': `attachment; filename="rasapos-backup-${new Date().toISOString().slice(0, 10)}.json"` }
         });
     });

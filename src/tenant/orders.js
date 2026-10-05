@@ -280,6 +280,7 @@ function deductStock(t, o, byIng, a) {
 }
 
 function onPaid(t, o, a, events) {
+    (t.lastSale ||= new Map()).set(o.outlet_id, Math.max(t.lastSale.get(o.outlet_id) || 0, o.closed_at || 0));
     const feat = features(t);
     const { byIng, costByItem } = usageOf(t, o);
     addSales(t, o, 1, null, costByItem);

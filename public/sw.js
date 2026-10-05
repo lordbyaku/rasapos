@@ -1,5 +1,5 @@
 // Service worker: app shell cache-first (aman offline), API selalu ke jaringan, foto menu di-cache permanen.
-const VERSION = '1.4.0+202610040259';
+const VERSION = '1.5.0+202610050416';
 const CACHE = 'rasapos-' + VERSION;
 const IMG_CACHE = 'rasapos-img';
 

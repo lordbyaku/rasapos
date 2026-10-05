@@ -16,8 +16,11 @@ const BO = {
     page(name, def) { this.pages[name] = def; },
     /** Fitur tenant aktif? (diatur superadmin) */
     has(key) { return !this.meta || !this.meta.features || this.meta.features[key] !== false; },
-    featureOff(view, label) {
-        view.innerHTML = `<div class="card p-10 text-center max-w-lg mx-auto"><i class="fas fa-toggle-off text-4xl text-stone-300"></i><h3 class="font-bold mt-3">Fitur ${esc(label)} tidak aktif</h3><p class="text-sm text-stone-500 mt-1">Fitur ini dinonaktifkan untuk usaha Anda. Hubungi admin RasaPOS jika ingin memakainya.</p></div>`;
+    featureOff(view, label, key) {
+        const lic = this.meta && this.meta.license;
+        const proOnly = ['kds', 'inventory'].includes(key) && lic && (lic.p || lic.plan) === 'basic';
+        const msg = proOnly ? 'Fitur ini termasuk <b>paket Pro</b> (Rp 200.000/bulan per 5 outlet). Hubungi admin RasaPOS untuk upgrade.' : 'Fitur ini dinonaktifkan untuk usaha Anda. Hubungi admin RasaPOS jika ingin memakainya.';
+        view.innerHTML = `<div class="card p-10 text-center max-w-lg mx-auto"><i class="fas fa-toggle-off text-4xl text-stone-300"></i><h3 class="font-bold mt-3">Fitur ${esc(label)} tidak aktif</h3><p class="text-sm text-stone-500 mt-1">${msg}</p></div>`;
     },
 
     // ---------------------------------------------------------------- start
@@ -88,6 +91,7 @@ const BO = {
         const name = (location.hash.slice(1) || 'dashboard').split('/')[0];
         const page = this.pages[name] || this.pages.dashboard;
         this.listeners = {};
+        this.routeSeq = (this.routeSeq || 0) + 1;
         $$('#nav [data-page]').forEach(a => a.classList.toggle('active', a.dataset.page === name));
         this.toggleSidebar(false);
         $('#page-title').textContent = page.title;
@@ -95,7 +99,7 @@ const BO = {
         const view = $('#view');
         view.innerHTML = '<div class="py-20 text-center text-stone-400"><i class="fas fa-spinner fa-spin text-2xl"></i></div>';
         const pf = this.PAGE_FEATURE[name];
-        if (pf && !this.has(pf[0])) return this.featureOff(view, pf[1]);
+        if (pf && !this.has(pf[0])) return this.featureOff(view, pf[1], pf[0]);
         try { await page.render(view); }
         catch (e) { view.innerHTML = `<div class="card p-8 text-center text-red-600">${esc(e.message)}</div>`; console.error(e); }
     },
@@ -114,6 +118,26 @@ const BO = {
         window.addEventListener('online', () => this.rt.reconnectNow());
     },
     on(type, fn) { (this.listeners[type] ||= []).push(fn); },
+    /**
+     * Muat ulang data karena event realtime, dihemat: paling sering sekali per `gap` ms dan hanya saat tab terlihat
+     * (tab di latar belakang menunggu sampai dibuka lagi). Mencegah ribuan muat ulang per hari pada outlet ramai.
+     */
+    live(fn, gap = 60000) {
+        const seq = this.routeSeq;
+        let last = 0, timer = null, pending = false;
+        const run = () => {
+            timer = null;
+            if (seq !== this.routeSeq) return;
+            if (document.hidden) { pending = true; return; }
+            pending = false; last = Date.now(); fn();
+        };
+        document.addEventListener('visibilitychange', () => { if (!document.hidden && pending && seq === this.routeSeq) run(); });
+        return () => {
+            if (timer) return;
+            const wait = Math.max(1500, gap - (Date.now() - last));
+            timer = setTimeout(run, wait);
+        };
+    },
 
     // ---------------------------------------------------------------- filter
     rangeDates() {

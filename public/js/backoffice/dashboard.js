@@ -24,7 +24,7 @@ BO.page('dashboard', {
                     <div class="card p-4"><h3 class="font-bold mb-3">Metode Pembayaran</h3><div id="d-pay" class="space-y-2 text-sm"></div></div>
                 </div>
             </div>`;
-        const reload = debounce(() => this.load(view, true), 2500);
+        const reload = BO.live(() => this.load(view, true));
         BO.on('sale.new', s => { this.prependSale(s); reload(); });
         BO.on('presence', () => reload());
         BO.on('shift.updated', () => reload());

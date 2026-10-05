@@ -7,6 +7,8 @@ import { registerOrders } from './orders.js';
 import { registerReports, dailyStats } from './reports.js';
 import { registerInventory } from './inventory.js';
 import { businessDate } from '../lib/time.js';
+import { tenantFeatures } from '../license.js';
+import { backupToR2, restoreFromStream } from './backup.js';
 
 const router = new Router();
 registerMaster(router);
@@ -14,10 +16,10 @@ registerOrders(router);
 registerReports(router);
 registerInventory(router);
 router.on('POST', '/internal/push-stats', async t => { await t.pushStats(); return { ok: true }; }, { internal: true });
-router.on('POST', '/internal/backup', async t => t.backup(), { internal: true });
+router.on('POST', '/internal/backup', async (t, req) => t.backup((await req.json().catch(() => ({}))).key), { internal: true });
 router.on('POST', '/internal/restore', async (t, req) => {
     const { importAll } = await import('./master.js');
-    const counts = importAll(t, await req.json());
+    const counts = await restoreFromStream(t, req.body, importAll);
     await t.pushStats();
     return { ok: true, counts };
 }, { internal: true });
@@ -76,8 +78,16 @@ export class TenantDO extends DurableObject {
             if (!m) throw new HttpError(404, 'Endpoint tidak ditemukan', 'not_found');
             if (m.opts.internal && a.kind !== 'system') throw forbidden();
             if (a.kind === 'public' && !m.opts.public) throw unauthorized();
+            const metrics = this.env.DEBUG_METRICS === '1';
+            if (metrics) this.db.track();
             const res = await m.handler(this, request, a, m.params, url);
-            return res instanceof Response ? res : json(res);
+            const out = res instanceof Response ? res : json(res);
+            if (!metrics) return out;
+            const u = this.db.usage();
+            const r = new Response(out.body, out);
+            r.headers.set('x-rows-read', String(u.read));
+            r.headers.set('x-rows-written', String(u.written));
+            return r;
         } catch (e) {
             return errorResponse(e);
         }
@@ -139,24 +149,27 @@ export class TenantDO extends DurableObject {
         if (!tenantId) return;
         const online = this.ctx.getWebSockets().length;
         const stmt = this.env.CORE.prepare('INSERT OR REPLACE INTO tenant_stats (tenant_id, date, outlets, trx, sales, devices_online, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        // Fitur: DO adalah sumber kebenaran; cermin di D1 (panel superadmin) diselaraskan ulang
-        const f = this.db.getMeta('features');
-        const featStmt = this.env.CORE.prepare('UPDATE tenants SET features = ? WHERE id = ?').bind(f && Object.keys(f).length ? JSON.stringify(f) : null, tenantId);
-        await this.env.CORE.batch([...dailyStats(this).map(s => stmt.bind(tenantId, s.date, s.outlets, s.trx, s.sales, online, Date.now())), featStmt]);
+        await this.env.CORE.batch(dailyStats(this).map(s => stmt.bind(tenantId, s.date, s.outlets, s.trx, s.sales, online, Date.now())));
+        // Fitur berlaku dihitung ulang dari D1 (pengaturan superadmin + paket + status lisensi, mis. trial berakhir)
+        const tenant = await this.env.CORE.prepare('SELECT * FROM tenants WHERE id = ?').bind(tenantId).first();
+        if (tenant) {
+            const { applyFeatures } = await import('./master.js');
+            applyFeatures(this, tenantFeatures(tenant, this.env));
+        }
     }
 
     /** Backup ke R2: tenant-<id>/<tanggal>.json (ditimpa bila diulang di hari yang sama), simpan 35 hari. */
-    async backup() {
+    /** Backup ke R2 (dialirkan, multipart): tenant-<id>/<tanggal>.ndjson, ditimpa bila diulang di hari yang sama, simpan 35 hari. */
+    async backup(customKey) {
         if (!this.env.BACKUP) throw new HttpError(503, 'Penyimpanan backup (R2) belum diaktifkan', 'backup_disabled');
         const tenantId = this.db.getMeta('tenant_id');
-        const { exportAll } = await import('./master.js');
-        const body = JSON.stringify(exportAll(this, { secrets: true }));
-        const key = `tenant-${tenantId}/${businessDate(Date.now(), 420, 0)}.json`;
-        await this.env.BACKUP.put(key, body, { httpMetadata: { contentType: 'application/json' }, customMetadata: { tenant_id: String(tenantId) } });
+        const prefix = `tenant-${tenantId}/`;
+        const key = customKey && String(customKey).startsWith(prefix) ? String(customKey) : `${prefix}${businessDate(Date.now(), 420, 0)}.ndjson`;
+        const res = await backupToR2(this, this.env.BACKUP, key, { tenant_id: String(tenantId) });
         const cutoff = Date.now() - 35 * 86400000;
-        const old = (await this.env.BACKUP.list({ prefix: `tenant-${tenantId}/` })).objects.filter(o => o.uploaded.getTime() < cutoff).map(o => o.key);
+        const old = (await this.env.BACKUP.list({ prefix })).objects.filter(o => o.uploaded.getTime() < cutoff).map(o => o.key);
         if (old.length) await this.env.BACKUP.delete(old);
-        return { key, size: body.length };
+        return res;
     }
 
     async alarm() {

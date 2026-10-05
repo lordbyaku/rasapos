@@ -4,6 +4,7 @@ import '../public/js/tutorial-content.js';
 import '../public/js/shared/tutorial-search.js';
 import { json, bad, readJson, HttpError } from './lib/http.js';
 import { rateLimit } from './auth.js';
+import { tenantFeatures } from './license.js';
 import '../public/js/shared/features.js';
 import { aiEnabled, generate, getSettings } from './ai-keys.js';
 
@@ -51,8 +52,8 @@ export async function handleAssist(request, env, auth) {
     if (request.method !== 'POST') throw new HttpError(405, 'Metode tidak didukung', 'method_not_allowed');
 
     const a = await auth();
-    const tenant = await env.CORE.prepare('SELECT features FROM tenants WHERE id = ?').bind(a.tid).first();
-    if (!globalThis.Features.resolve(tenant && tenant.features).ai) throw new HttpError(403, 'Asisten AI tidak aktif untuk usaha Anda', 'ai_disabled');
+    const tenant = await env.CORE.prepare('SELECT * FROM tenants WHERE id = ?').bind(a.tid).first();
+    if (!tenant || !tenantFeatures(tenant, env).ai) throw new HttpError(403, 'Asisten AI tidak aktif untuk usaha Anda', 'ai_disabled');
     if (!(await aiEnabled(env))) throw new HttpError(503, 'Asisten AI belum diaktifkan', 'ai_disabled');
     const cfg = await getSettings(env);
     const body = await readJson(request, 20000);

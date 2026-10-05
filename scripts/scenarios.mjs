@@ -980,15 +980,16 @@ await t('N8 input superadmin aneh: tenant tidak ada, body rusak, nilai bukan boo
     await ok('PUT', `/admin/tenants/${reg.tenant.id}/features`, {}, A);
     assert.equal(await logs(), n, 'tanpa perubahan → tidak ada catatan riwayat');
 });
-await t('N9 cermin fitur di panel menyimpang → diselaraskan dari tenant saat statistik diperbarui', async () => {
+await t('N9 tenant tertinggal dari panel (gagal sinkron) → diselaraskan dari panel saat sinkron malam/statistik', async () => {
     if (!/localhost|127\.0\.0\.1/.test(BASE)) return;
-    await setFeatures({ kds: false });
     const { execSync } = await import('node:child_process');
-    execSync(`npx wrangler d1 execute rasapos-core --local --command "UPDATE tenants SET features = NULL WHERE id = ${reg.tenant.id}"`, { stdio: 'ignore' });
-    assert.equal((await ok('GET', `/admin/tenants/${reg.tenant.id}`, null, A)).tenant.features.kds, true, 'panel menyimpang (simulasi)');
+    // Panel (D1) berubah tanpa sempat terkirim ke tenant
+    execSync(`npx wrangler d1 execute rasapos-core --local --command "UPDATE tenants SET features = '{\\"kds\\":false}' WHERE id = ${reg.tenant.id}"`, { stdio: 'ignore' });
+    assert.equal((await ok('GET', `/t/bootstrap?outlet=${o1.id}`, null, K1)).features.kds, true, 'tenant belum tahu (simulasi)');
     await ok('POST', `/admin/tenants/${reg.tenant.id}/refresh-stats`, {}, A);
-    assert.equal((await ok('GET', `/admin/tenants/${reg.tenant.id}`, null, A)).tenant.features.kds, false, 'panel kembali sesuai tenant');
+    assert.equal((await ok('GET', `/t/bootstrap?outlet=${o1.id}`, null, K1)).features.kds, false, 'tenant mengikuti panel');
     await setFeatures({ kds: true });
+    assert.equal((await ok('GET', `/t/bootstrap?outlet=${o1.id}`, null, K1)).features.kds, true);
 });
 await t('N10 semua fitur mati sekaligus: alur kasir dasar tetap lengkap (buka → kirim → diskon manual → bayar → refund)', async () => {
     await withFeatures({ kds: false, tables: false, inventory: false, marketing: false, ai: false }, async () => {
@@ -1047,6 +1048,50 @@ await t('O3 panel sistem & perawatan harian (superadmin saja)', async () => {
     const m = await ok('POST', '/admin/system/maintenance', {}, A);
     assert.equal(typeof m.errors, 'number');
     assert.equal((await call('GET', '/admin/system', null, U)).status, 403);
+});
+
+// =====================================================================================
+// P. PAKET BASIC / PRO
+// =====================================================================================
+await t('P1 paket Basic: trial tetap semua fitur; setelah bayar KDS & Inventori nonaktif dan dikunci', async () => {
+    const r = await ok('POST', '/auth/register', { accept_terms: true, business_name: 'Kedai Basic', owner_name: 'B', email: `basic+${stamp}@contoh.id`, password: 'rahasia123' });
+    const T = { authorization: 'Bearer ' + r.access_token };
+    const tid = r.tenant.id;
+    await ok('POST', `/admin/tenants/${tid}/subscription`, { action: 'plan', plan: 'basic' }, A);
+    assert.equal((await ok('GET', '/t/meta', null, T)).features.kds, true, 'trial: semua fitur');
+    const ext = await ok('POST', `/admin/tenants/${tid}/subscription`, { action: 'extend', months: 12, packs: 2, plan: 'basic' }, A);
+    assert.equal(ext.tenant.plan, 'basic'); assert.equal(ext.tenant.features.kds, false); assert.equal(ext.tenant.features.inventory, false);
+    const det = await ok('GET', `/admin/tenants/${tid}`, null, A);
+    assert.ok(det.logs.some(l => /Rp 2\.000\.000/.test(l.detail)), 'tagihan 2 paket Basic tahunan tercatat: ' + det.logs[0].detail);
+    const relog = await ok('POST', '/auth/login', { email: `basic+${stamp}@contoh.id`, password: 'rahasia123' });
+    assert.equal(relog.tenant.license.plan, 'basic');
+    const T2 = { authorization: 'Bearer ' + relog.access_token };
+    const meta2 = await ok('GET', '/t/meta', null, T2);
+    assert.deepEqual([meta2.features.kds, meta2.features.inventory, meta2.features.tables, meta2.features.marketing], [false, false, true, true]);
+    assert.equal(meta2.license.p, 'basic');
+    assert.equal((await call('GET', `/t/stock?outlet=${meta2.outlets[0].id}`, null, T2)).status, 403);
+    assert.equal((await call('POST', '/t/pair-codes', { outlet_id: meta2.outlets[0].id, type: 'kds', name: 'D' }, T2)).status, 403);
+    const en = await call('PUT', `/admin/tenants/${tid}/features`, { features: { kds: true } }, A);
+    assert.equal(en.status, 400); assert.equal(en.data.code, 'plan_required');
+    // fitur lain tetap bisa diatur manual
+    const off = await ok('PUT', `/admin/tenants/${tid}/features`, { features: { marketing: false } }, A);
+    assert.equal(off.features.marketing, false);
+    // upgrade ke Pro → KDS & Inventori aktif, pengaturan manual (promo mati) tetap, pengingat opname muncul
+    const up = await ok('POST', `/admin/tenants/${tid}/subscription`, { action: 'plan', plan: 'pro' }, A);
+    assert.deepEqual([up.tenant.features.kds, up.tenant.features.inventory, up.tenant.features.marketing], [true, true, false]);
+    const st = await ok('GET', `/t/stock?outlet=${meta2.outlets[0].id}`, null, T2);
+    assert.ok(st.gap, 'inventori sempat mati → pengingat stock opname');
+    // kembali ke Basic
+    const down = await ok('POST', `/admin/tenants/${tid}/subscription`, { action: 'plan', plan: 'basic' }, A);
+    assert.equal(down.tenant.features.kds, false);
+    assert.equal((await call('POST', `/admin/tenants/${tid}/subscription`, { action: 'plan', plan: 'gold' }, A)).status, 400);
+});
+await t('P2 tenant lama (tanpa kolom paket diisi) tetap Pro & semua fitur; harga paket benar', async () => {
+    const d = await ok('GET', `/admin/tenants/${reg.tenant.id}`, null, A);
+    assert.equal(d.tenant.plan, 'pro');
+    assert.equal(d.tenant.license.plan, 'pro');
+    const r = await ok('POST', '/auth/login', { email, password: 'rahasia123' });
+    assert.equal(r.tenant.license.plan, 'pro');
 });
 
 // =====================================================================================
