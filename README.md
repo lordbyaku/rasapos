@@ -82,6 +82,14 @@ Superadmin → **Sistem**: error server 24 jam/7 hari, endpoint yang paling seri
 ## Impor menu
 Back Office → Menu & Harga → **Impor CSV** (template tersedia). Kolom: nama, harga, kategori, stasiun, sku, deskripsi, pajak. Pratinjau dulu; SKU/nama sama → diperbarui; kategori baru dibuat otomatis; maks. 1000 baris.
 
+## Paket & harga (lihat /syarat.html)
+| Paket | Bulanan | Tahunan | Atur di Superadmin → tenant → Fitur |
+|---|---|---|---|
+| Basic | Rp 100.000 | Rp 1.000.000 | matikan **Layar Dapur (KDS)** & **Inventori & resep** |
+| Pro | Rp 200.000 | Rp 2.000.000 | semua fitur aktif |
+
+Harga per paket (maks. 5 outlet). Pembayaran: transfer SeaBank a.n. Haritrisna Suryadimarta, konfirmasi via WhatsApp; aktifkan lewat Superadmin → Perpanjang langganan.
+
 ## Fitur per tenant
 Superadmin → klik tenant → **Fitur**: KDS, Meja & denah, Inventori & resep, Promo/pelanggan/poin, Asisten AI bisa dimatikan per usaha
 (mis. usaha yang hanya butuh transaksi). Ditegakkan di server; tablet menyesuaikan saat memuat ulang data. Definisi: `public/js/shared/features.js`.

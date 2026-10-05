@@ -91,7 +91,7 @@ function sendResetEmail(env, email, link) {
 }
 
 /** Ubah bila isi S&K / Kebijakan Privasi berubah (dicatat saat pendaftaran) */
-export const TERMS_VERSION = '2026-10-04';
+export const TERMS_VERSION = '2026-10-05';
 
 const iterations = env => Number(env.PBKDF2_ITERATIONS || 60000);
 
